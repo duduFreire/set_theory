@@ -4,13 +4,13 @@ noncomputable theory
 
 namespace test 
 
-def relation : Type 1 := Type → Type → Prop
+notation `Set` := Type 0
+def relation := Set → Set → Prop
 constant mem  : relation
 
-instance : has_mem Type Type :=
+instance : has_mem Set Set :=
 ⟨mem⟩
 
-notation `Set` := Type 0
 
 def fclass := Set → Prop
 def is_set (X : fclass) : Prop := ∃(y : Set), ∀(z : Set), z ∈ y ↔ X z 
@@ -20,9 +20,9 @@ def set_of {φ : fclass} (h : is_set φ) : Set := classical.some h
 @[simp]lemma mem_set_of (x : Set) {φ : fclass} (h : is_set φ) : x ∈ set_of h ↔ φ x := 
 (classical.some_spec h) x
 
-def mem_class (a : Type) (X : fclass) := X a
+def mem_class (a : Set) (X : fclass) := X a
 
-instance : has_mem Type fclass := ⟨mem_class⟩
+instance : has_mem Set fclass := ⟨mem_class⟩
 
 lemma existence : nonempty Set := nonempty_of_inhabited
 
@@ -38,8 +38,6 @@ begin
 	cases existence,
 	use val,
 end
-
-open_locale classical
 
 def is_empty (x : Set) : Prop := ∀z, z ∉ x
 theorem empty_set_exists : ∃x, is_empty x := 
@@ -275,9 +273,7 @@ theorem empty_set_is_ordinal : ∅ ∈ ON := nonempty.intro empty_is_ordinal
 def univ : fclass := λx, true 
 theorem univ_is_proper_class : proper_class univ := 
 begin 
-	by_contra,
-	unfold proper_class at h,
-	simp at h,
+	intro h,
 	cases h with V hV,
 	cases specification_axiom V (λx, x ∉ x) with R hR,
 	specialize hR R,
@@ -561,7 +557,7 @@ begin
 	exact nonempty.intro hy_is_on,
 end
 
-lemma mem_of_ordinal_is_ordinal {x y: Set} (hx : ON x) (hyx : y ∈ x) : ON y :=
+lemma mem_of_ordinal_is_ordinal {x y: Set} (hx : x ∈ ON) (hyx : y ∈ x) : ON y :=
 ON_is_transitive hx hyx
 
 lemma diff_exists (x y : Set) : ∃(z : Set), ∀a, a ∈ z ↔ (a ∈ x ∧ a ∉ y) := specification_axiom x (λa, a ∉ y)
@@ -595,7 +591,7 @@ lemma diff_subset (x y : Set) : x \ y ⊆ x := begin
 	exact hz.1,
 end
 
-def pair_inter_ordinal {a b : Set} (ha : ordinal a) (hb : ordinal b) : ordinal (a ∩ b) :=
+lemma pair_inter_ordinal {a b : Set} (ha : ordinal a) (hb : ordinal b) : ordinal (a ∩ b) :=
 {
 	tran := begin 
 		intros x hx z hzx,
@@ -984,13 +980,16 @@ begin
 	have x_ord := nat_is_ord x_nat,
 	have hy_ord := mem_of_ordinal_is_ordinal (nonempty.intro x_ord) hyx,
 	have y_ord := ord_of_mem_ON hy_ord,
-	split, {exact hy_ord},
 
-	intros z z_ord hz_le_y,
-	have hy_le_x : y ≤ x := or.inl hyx,
-	have z_le_x : z ≤ x := le_tran z_ord y_ord x_ord hz_le_y hy_le_x,
-	cases x_nat with __ hx,
-	exact hx z_ord z_le_x
+	split, 
+	{exact hy_ord},
+	{
+		intros z z_ord hz_le_y,
+		have hy_le_x : y ≤ x := or.inl hyx,
+		have z_le_x : z ≤ x := le_tran z_ord y_ord x_ord hz_le_y hy_le_x,
+		cases x_nat with __ hx,
+		exact hx z_ord z_le_x
+	}
 end
 
 lemma succ_of_nat_is_nat {x : Set} (x_nat : x ∈ nat) : succ x ∈ nat :=
@@ -1139,8 +1138,7 @@ begin
 end
 
 
-def omega : Set := classical.some nat_is_set
-notation `ω` := omega 
+def ω : Set := classical.some nat_is_set
 
 lemma tran_set_of_ord_is_ord {x : Set} (x_tran : transitive x) (x_ords : subset_class x ON) : 
 ordinal x := 
@@ -1305,5 +1303,442 @@ begin
 		exact inductive_set_contains_nat this hn,
 	}
 end
+
+lemma sing_is_pair (x : Set) : pair_set x x = sing x := rfl
+lemma sing_eq (x y : Set) : sing x = sing y ↔ x = y := 
+begin 
+	split,
+	{
+		intro h,
+		have : x ∈ sing x := (mem_sing x x).mpr rfl,
+		rw h at this,
+		simp at this,
+		exact this,
+	},
+	{
+		exact congr_arg (λ (x : Set), sing x),
+	},
+end
+
+lemma mem_pair_fst (a b : Set) : a ∈ pair_set a b :=
+begin 
+	rw mem_pair,
+	exact or.inl rfl,
+end
+
+lemma mem_pair_snd (a b : Set) : b ∈ pair_set a b :=
+begin 
+	rw mem_pair,
+	exact or.inr rfl,
+end
+
+def ord_pair (x y : Set) := pair_set (sing x) (pair_set x y)
+
+lemma ord_pair_eq {x y a b : Set} : ord_pair x y = ord_pair a b → x = a ∧ y = b := 
+begin 
+	unfold ord_pair,
+
+	intro h,
+	by_cases hxy : x = y,
+	{
+		rw← hxy at h,
+		rw sing_is_pair at h,
+		rw sing_is_pair at h,
+		have hx : sing x ∈ pair_set (sing a) (pair_set a b),
+		{rw← h, simp},
+		simp at hx,
+		cases hx,
+		{
+			rw sing_eq at hx,
+			use hx,
+			have : (pair_set a b) ∈ sing (sing x),
+			{rw h, rw mem_pair, exact or.inr rfl},
+			simp at this,
+			rw hx at this,
+			have hb := mem_pair_snd a b,
+			rw this at hb,
+			rw mem_sing at hb,
+			exact (eq.congr hxy (eq.symm hb)).mp hx,
+		},
+		{
+			have ha := mem_pair_fst a b,
+			rw← hx at ha,
+			rw mem_sing at ha,
+			use ha.symm,
+
+			have hb := mem_pair_snd a b,
+			rw ← hx at hb,
+			rw mem_sing at hb,
+			exact (rfl.congr (eq.symm hb)).mp (eq.symm hxy),
+		},
+	},
+	{
+		have hxa : x = a,
+		{
+			have hx := mem_pair_fst (sing x) (pair_set x y),
+			rw h at hx, simp at hx,
+			cases hx,
+			{exact (sing_eq x a).mp hx},
+			{
+				have := mem_pair_fst a b,
+				rw← hx at this, simp at this,
+				exact this.symm,
+			},
+		},
+		use hxa,
+
+		have temp := mem_pair_snd (sing x) (pair_set x y),
+		rw h at temp, simp at temp,
+		cases temp,
+		{
+			exfalso,
+			have := mem_pair_snd x y,
+			rw temp at this, simp at this,
+			finish,
+		},
+		{
+			have := mem_pair_snd x y,
+			rw temp at this, simp at this,
+			cases this,
+			{exfalso,finish},
+			{exact this},
+		},
+	}
+end
+
+lemma ord_pair_eq_iff (x y a b : Set) : 
+ord_pair x y = ord_pair a b ↔ x = a ∧ y = b := 
+begin 
+	split,
+	{exact ord_pair_eq},
+	{
+		intro h,
+		exact congr (congr_arg ord_pair h.1) h.2,
+	},
+end
+
+def is_ord_pair (x : Set) : Prop := ∃a b, x = ord_pair a b
+
+def set_relation (x : Set) : Prop := ∀⦃y⦄, y ∈ x → is_ord_pair y
+def set_function (x : Set) : Prop := ∀⦃y⦄, y ∈ x → ∃b a, y = ord_pair a b ∧ ∀⦃c⦄,
+ ord_pair a c ∈ x → b = c
+
+def function (φ : relation) := ∀x, ∃y, φ x y ∧ ∀z, φ x z → y = z
+
+axiom replacement_axiom {φ : relation} (h : function φ) (A : Set) : 
+∃B : Set, ∀⦃y⦄, (∃⦃z⦄ (hz : z ∈ A), φ z y) → y ∈ B
+
+lemma replacement' {φ : relation} (h : function φ) (A : Set) : 
+∃B : Set, ∀⦃y⦄, (∃⦃z⦄ (hz : z ∈ A), φ z y) ↔ y ∈ B :=
+begin
+	cases replacement_axiom h A with B hB,
+
+	let P := λx, (∃⦃z⦄ (hz : z ∈ A), φ z x),
+	have hP : subclass_set P B,
+	{
+		intros t ht,
+		apply hB,
+		rcases ht with ⟨z, hz1, hz2⟩,
+		use z,
+		exact ⟨hz1, hz2⟩,
+	},
+
+	cases (subclass_of_set_is_set hP) with C hC,
+	use C,
+	intro y,
+	rw hC y,
+end
+
+lemma domain_exists (x : Set) : ∃D : Set, ∀z, z ∈ D ↔ (∃b, ord_pair z b ∈ x) :=
+begin 
+	let φ := λn m, (∃b, n = ord_pair m b) ∨ (¬is_ord_pair n ∧ m = ∅),
+	have := @replacement_axiom φ _ x, swap,
+	{
+		intros n,
+		by_cases is_ord_pair n,
+		{
+			rcases h with ⟨m, b, hmb⟩,
+			use m,
+			split,
+			{
+				left,
+				use b,
+				exact hmb,
+			},
+			{
+				intros m' hm',
+				cases hm',
+				{
+					cases hm' with b' hb',
+					rw hb' at hmb,
+					exact (ord_pair_eq hmb).1.symm,
+				},
+				{
+					exfalso, 
+					apply hm'.1,
+					use [m, b],
+					exact hmb,
+				},
+			},
+		},
+		{
+			use ∅,
+			split,
+			{
+				right,
+				use h,
+			},
+			{
+				intros z hz,
+				cases hz,
+				{
+					exfalso,
+					cases hz with b hb,
+					apply h,
+					use [z, b],
+					exact hb,
+				},
+				{
+					exact hz.2.symm,
+				},
+			},
+		},
+	},
+	let P := λz, ∃ (b : Set), ord_pair z b ∈ x,
+	cases this with B hB,
+	have hP : subclass_set P B,
+	{
+		intros y hy,
+		apply hB,
+		cases hy with t ht,
+		use ord_pair y t, use ht,
+		finish,
+	},
+	cases (subclass_of_set_is_set hP) with D hD,
+	use D,
+	finish,
+end
+
+def domain (x : Set) : Set := classical.some (domain_exists x)
+@[simp]lemma mem_domain (y x : Set) : y ∈ domain x ↔ ∃ (b : Set), ord_pair y b ∈ x
+:= classical.some_spec (domain_exists x) y
+
+lemma inv_exists (X : Set) : 
+∃I : Set, ∀m, m ∈ I ↔ ∃n a b, (n ∈ X ∧ n = ord_pair a b ∧ m = ord_pair b a) :=
+begin 
+	let φ := λn m, (∃a b, n = ord_pair a b ∧
+	m = ord_pair b a) ∨ (¬is_ord_pair n ∧ m = ∅),
+
+	have := @replacement_axiom φ _ X, swap,
+	{
+		intros n,
+		by_cases is_ord_pair n,
+		{
+			rcases h with ⟨a, b, hab⟩,
+			use ord_pair b a,
+			split,
+			{
+				left,
+				use [a, b],
+				exact ⟨hab, rfl⟩,
+			},
+			{
+				intros m' hm',
+				cases hm',
+				{
+					rcases hm' with ⟨a', b', hab'⟩,
+					rw hab'.1 at hab,
+					rw hab'.2,
+					rw ord_pair_eq_iff at *,
+					tauto,
+				},
+				{
+					exfalso,
+					apply hm'.1,
+					use [a, b],
+					exact hab,
+				},
+			},
+		},
+		{
+			use ∅,
+			split,
+			{right, use h,},
+			{
+				intros m hm,
+				cases hm,
+				{
+					exfalso,
+					apply h,
+					rcases hm with ⟨a, b, hab⟩,
+					use [a, b],
+					exact hab.1,
+				},
+				{exact hm.2.symm,},
+			},
+		},
+	},
+	 
+	let P := λm, ∃ (n a b : Set), n ∈ X ∧ n = ord_pair a b ∧ m = ord_pair b a,
+	cases this with B hB,
+	have hP : subclass_set P B,
+	{
+		intros m hm,
+		apply hB,
+		rcases hm with ⟨x, a, b, hx⟩,
+		use ord_pair a b,
+		split,
+		{finish},
+		{
+			left,
+			finish,
+		},
+	},
+	cases (subclass_of_set_is_set hP) with I hI,
+	use I,
+	exact hI,
+end
+
+def inv (x : Set) : Set := classical.some (inv_exists x)
+@[simp]lemma mem_inv (y x : Set) : 
+y ∈ inv x ↔ ∃ (n a b : Set), n ∈ x ∧ n = ord_pair a b ∧ y = ord_pair b a :=
+classical.some_spec (inv_exists x) y
+
+def range (x : Set) : Set := domain (inv x)
+@[simp]lemma mem_range (y x : Set) : y ∈ range x ↔ ∃a, ord_pair a y ∈ x :=
+begin 
+	unfold range,
+	simp,
+	split,
+	{
+		intro h,
+		rcases h with ⟨b, n, hn, c, d, hcd⟩,
+		use c,
+		suffices hn2 : n = ord_pair c y,
+		{
+			rw← hn2,
+			exact hn,
+		},
+		{
+			rw hcd.1,
+			rw ord_pair_eq_iff at *,
+			use rfl,
+			finish,
+		},
+	},
+	{
+		intro h,
+		cases h with a ha,
+		use [a, ord_pair a y, ha, a, y, rfl],
+	},
+end
+
+lemma eval_exists {f x : Set} (f_func : set_function f) (hx : x ∈ domain f) :
+∃(y : Set) (hy : y ∈ range f), ord_pair x y ∈ f :=
+begin 
+	rw mem_domain at hx,
+	cases hx with y hy,
+	use y,
+	simp,
+	split,
+	{
+		use x,
+		exact hy,
+	},
+	{exact hy},
+end
+
+def eval {f x : Set} (f_func : set_function f) (hx : x ∈ domain f) := 
+classical.some (eval_exists f_func hx)
+
+lemma eval_spec {f x : Set} (f_func : set_function f) (hx : x ∈ domain f)
+: ∃(hy : eval f_func hx ∈ range f), ord_pair x (eval f_func hx ) ∈ f :=
+classical.some_spec (eval_exists f_func hx)
+
+infix ` @@ `: 1000 := eval
+
+lemma eval_unique {f x : Set} (f_func : set_function f) (hx : x ∈ domain f) {y : Set} :
+ord_pair x y ∈ f → y = f_func @@ hx := 
+begin
+	intro h,
+	cases eval_spec f_func hx with hord hpair,
+	rcases f_func hpair with ⟨b, a, hab⟩,
+	rw ord_pair_eq_iff at hab,
+	cases hab,
+	rw← hab_left.1 at hab_right,
+	rw← hab_left.2 at hab_right,
+	exact (hab_right h).symm,
+end
+
+lemma mem_range_iff_eval {f : Set} (f_func : set_function f) : ∀⦃y⦄, y ∈ range f ↔
+ ∃(x : Set) (hx : x ∈ domain f), y = f_func @@ hx :=
+begin 
+	intro y,
+	split,
+	{
+		intro h,
+		simp at h,
+		cases h with a ha,
+		use a,
+		have haf : a ∈ domain f,
+		{
+			simp,
+			use y,
+			exact ha,
+		},
+		use haf,
+		apply eval_unique f_func haf ha,
+	},
+	{
+		intro h,
+		simp,
+		rcases h with ⟨a, haf, ha⟩,
+		use a,
+		rw mem_domain at haf,
+		cases haf with b hb,
+		rw ha,
+		cases eval_spec f_func haf with heval,
+		exact h,
+	},
+end
+
+def injective {f : Set} (f_func : set_function f) := 
+∀⦃x y⦄ {hxf : x ∈ domain f} {hyf : y ∈ domain f}, f_func @@ hxf = f_func @@ hyf →
+x = y
+
+structure full_func (f : Set) :=
+(f_func : set_function f)
+(codomain : Set)
+(h_codomain : range f ⊆ codomain)
+
+def surjective {f : Set} (f_func : full_func f) := f_func.codomain ⊆ range f
+
+lemma surjective_iff_eq {f : Set} (f_func : full_func f) : 
+surjective f_func ↔ f_func.codomain = range f :=
+begin 
+	split,
+	{
+		rw eq_iff_subsets,
+		intro h,
+		use h,
+		exact f_func.h_codomain,
+	},
+	{
+		intro h,
+		unfold surjective,
+		rw h,
+		exact subset_self (range f),
+	},
+end
+
+structure bijection (f : Set) extends full_func f :=
+(injective : injective f_func)
+(surjective : surjective (full_func.mk f_func codomain h_codomain))
+
+def same_card (x y : Set) := 
+∃(f : Set) (f_bi : bijection f), domain f = x ∧ f_bi.codomain = y
+
+
+
 
 end test
