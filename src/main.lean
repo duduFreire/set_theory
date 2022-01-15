@@ -1424,6 +1424,8 @@ def set_function (x : Set) : Prop := ∀⦃y⦄, y ∈ x → ∃b a, y = ord_pai
  ord_pair a c ∈ x → b = c
 
 def function (φ : relation) := ∀x, ∃y, φ x y ∧ ∀z, φ x z → y = z
+def function_on_set (φ : relation) (X : Set) 
+:= ∀⦃x⦄, x ∈ X → ∃y , φ x y ∧ ∀z, φ x z → y = z
 
 axiom replacement_axiom {φ : relation} (h : function φ) (A : Set) : 
 ∃B : Set, ∀⦃y⦄, (∃⦃z⦄ (hz : z ∈ A), φ z y) → y ∈ B
@@ -1731,6 +1733,44 @@ begin
 	},
 end
 
+lemma inv_of_inj_is_func {f : Set} {f_func : set_function f}
+(f_inj : injective f_func) : set_function (inv f) :=
+begin 
+	intros p hp,
+	rw mem_inv at hp,
+	rcases hp with ⟨n, a, b, hn⟩,
+	use [a, b],
+	split,
+	{
+		rw hn.2.2,
+	},
+	{
+		intros c hc,
+		rw mem_inv at hc,
+		rcases hc with ⟨m, a', b', hm⟩,
+		rw ord_pair_eq_iff at hm,
+		rcases hm with ⟨hm1, hm2, hm3⟩,
+		rw [←hm3.1, ←hm3.2] at hm2,
+		rw hm2 at hm1,
+		rcases hn with ⟨hn1, hn2, hn3⟩,
+		rw hn2 at hn1,
+		have haf : a ∈ domain f,
+		{
+			rw mem_domain,
+			use [b, hn1],
+		},
+		have hcf : c ∈ domain f,
+		{
+			rw mem_domain,
+			use [b, hm1],
+		},
+		have hba := eval_unique f_func haf hn1,
+		have hbc := eval_unique f_func hcf hm1,
+		rw hba at hbc,
+		exact f_inj hbc,
+	},
+end
+
 structure bijection (f : Set) extends full_func f :=
 (injective : injective f_func)
 (surjective : surjective (full_func.mk f_func codomain h_codomain))
@@ -1738,7 +1778,196 @@ structure bijection (f : Set) extends full_func f :=
 def same_card (x y : Set) := 
 ∃(f : Set) (f_bi : bijection f), domain f = x ∧ f_bi.codomain = y
 
+lemma restricted_replacement {φ : relation} {X : Set} (hφ : function_on_set φ X) :
+∃B : Set, ∀z, z ∈ B ↔ ∃x ∈ X, φ x z := 
+begin 
+	let P := λ x y, (x ∈ X ∧ φ x y) ∨ (x ∉ X ∧ y = ∅),
+	have P_func : function P,
+	{
+		intro x,
+		by_cases hx : x ∈ X,
+		{
+			cases hφ hx with y hy,
+			use y,
+			split,
+			{
+				left,
+				use [hx, hy.1],
+			},
+			{
+				intros y' hy',
+				cases hy',
+				{exact hy.2 y' hy'.2},
+				{finish},
+			},
+		},
+		{
+			use ∅,
+			split,
+			{
+				right,
+				use hx,
+			},
+			{
+				intros z hz,
+				cases hz,
+				{finish},
+				{finish},
+			},
+		},
+	},
 
+	cases replacement_axiom P_func X with C hC,
+	have h_subclass : subclass_set (λ z, ∃ (x : Set) (H : x ∈ X), φ x z) C := 
+	by finish,
+
+	cases subclass_of_set_is_set h_subclass with B hB,
+	use B,
+	exact hB,
+end
+
+
+lemma prod_exists (A B : Set) : ∃C : Set, ∀p, p ∈ C ↔
+ ∃a b, a ∈ A ∧ b ∈ B ∧ p = ord_pair a b :=
+begin 
+	have lem_1 : ∀⦃a⦄, a ∈ A → ∃ D : Set, ∀p, p ∈ D ↔ ∃b, b ∈ B ∧ p = ord_pair a b,
+	{
+		intros a ha,
+		let φ := λx y, y = ord_pair a x,
+		have φ_func : function_on_set φ B,
+		{
+			intros x hx,
+			use ord_pair a x,
+			split,
+			{exact rfl,},
+			{exact λ {b : Set}, eq_comm.mpr},
+		},
+
+		cases restricted_replacement φ_func with D hD,
+		use D,
+		finish,
+	},
+	let φ := λx y, ∀p, p ∈ y ↔ ∃b, b ∈ B ∧ p = ord_pair x b,
+	have φ_func : function_on_set φ A,
+	{
+		intros a ha,
+		cases lem_1 ha with y hy,
+		use y,
+		split,
+		{exact hy},
+		{
+			intros z hz,
+			ext,
+			exact iff.trans (hy z_1) (iff.symm (hz z_1)),
+		},
+	},
+	cases restricted_replacement φ_func with F hF,
+	use union F,
+	simp,
+	intros p,
+	split,
+	{
+		intro h,
+		cases h with Y hY,
+		rw hF at hY,
+		cases hY with temp hpY,
+		rcases temp with ⟨a, ha, hφa⟩,
+		use [a, ha],
+		rw hφa p at hpY,
+		cases hpY with x hx,
+		use [x, hx.1, hx.2],
+	},
+	{
+		intro h,
+		rcases h with ⟨a, haA, b, hbB, hbp⟩,
+		cases lem_1 haA with Y hY,
+		use Y,
+		split,
+		{
+			rw hF,
+			use [a, haA],
+			exact hY,
+		},
+		{
+			rw hY,
+			use [b, hbB, hbp],
+		},
+	},
+end
+
+def prod (A B : Set) := classical.some (prod_exists A B)
+
+class has_set_prod (α β : Type 1) (γ : out_param (Type 1)) :=
+(prod : α → β → γ)
+
+infix ` × ` :72 := prod
+
+lemma mem_prod (A B : Set) : ∀p, p ∈ A × B ↔ ∃a b, a ∈ A ∧ b ∈ B ∧ p = ord_pair a b
+:= classical.some_spec (prod_exists A B)
+
+lemma mem_prod_pair (a b A B : Set) : ord_pair a b ∈ A × B ↔ a ∈ A ∧ b ∈ B :=
+begin 
+	rw mem_prod,
+	split,
+	{
+		intro h,
+		rcases h with ⟨x, y, hxy⟩,
+		rw ord_pair_eq_iff at hxy,
+		finish,
+	},
+	{
+		intro h,
+		use [a, b, h.1, h.2],
+	},
+end
+
+instance : has_singleton Set Set := ⟨sing⟩
+
+instance : has_insert Set Set :=
+⟨λ a s, sing a ∪ s⟩
+
+lemma helper : ∀x : Set, sing x ∪ ∅ = sing x := 
+begin 
+	intros x,
+	ext,
+	simp,
+end
+
+instance : is_lawful_singleton Set Set := ⟨helper⟩
+
+def set_restriction (f A : Set) := 
+classical.some (specification_axiom f (λx, ∃a b, a ∈ A ∧ x = ord_pair a b))
+
+lemma mem_restriction (f A : Set) :
+ ∀x, x ∈ set_restriction f A ↔ x ∈ f ∧ ∃a b, a ∈ A ∧ x = ord_pair a b :=
+classical.some_spec (specification_axiom f (λx, ∃a b, a ∈ A ∧ x = ord_pair a b))
+
+lemma is_func_restriction {f : Set} (A : Set) (f_func : set_function f) :
+ set_function (set_restriction f A) := 
+begin 
+	intros x hx,
+	rw mem_restriction at hx,
+	rcases hx with ⟨hxf, a, b, hab⟩,
+	use [b, a, hab.2],
+	intros c hc,
+	rw mem_restriction at hc,
+	rw hab.2 at hxf,
+	rcases f_func hxf with ⟨c', a', hac1, hac2⟩,
+	rw ord_pair_eq_iff at hac1,
+	rw hac1.1 at hc,
+	rw hac1.2,
+	exact hac2 hc.1,
+ end
+
+def comp (g f : Set) := 
+classical.some (specification_axiom ((domain f) × range g) 
+(λp, ∃x y z, ord_pair x z ∈ f ∧ ord_pair z y ∈ g))
+
+lemma mem_comp (g f : Set) : 
+∀p, p ∈ comp g f ↔ p ∈ (domain f × range g) ∧
+∃x y z, ord_pair x z ∈ f ∧ ord_pair z y ∈ g := classical.some_spec
+((specification_axiom ((domain f) × range g) 
+(λp, ∃x y z, ord_pair x z ∈ f ∧ ord_pair z y ∈ g)))
 
 
 end test
