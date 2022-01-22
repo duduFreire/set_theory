@@ -1423,9 +1423,9 @@ def is_set_relation (x : Set) : Prop := ∀⦃y⦄, y ∈ x → is_ord_pair y
 def is_set_function (x : Set) : Prop := ∀⦃y⦄, y ∈ x → ∃b a, y = ord_pair a b ∧ ∀⦃c⦄,
  ord_pair a c ∈ x → b = c
 
-def is_class_function (φ : relation) : Prop := ∀x, ∃y, φ x y ∧ ∀z, φ x z → y = z
+def is_class_function (φ : relation) : Prop := ∀x, ∃y, φ x y ∧ ∀⦃z⦄, φ x z → y = z
 def is_class_function_on_set (φ : relation) (X : Set) : Prop :=
- ∀⦃x⦄, x ∈ X → ∃y , φ x y ∧ ∀z, φ x z → y = z
+ ∀⦃x⦄, x ∈ X → ∃y , φ x y ∧ ∀⦃z⦄, φ x z → y = z
 
  structure set_function (f : Set) :=
  (is_func : is_set_function f)
@@ -1690,10 +1690,8 @@ lemma eval_spec (f : Set) {x : Set} [set_function f] (hx : x ∈ domain f)
 : ∃(hy : eval f hx ∈ range f), ord_pair x (eval f hx ) ∈ f :=
 classical.some_spec (eval_exists f hx)
 
-infix ` @@ `: 1000 := eval
-
 lemma eval_unique (f : Set) {x : Set} [set_function f] (hx : x ∈ domain f)  {y : Set} :
-ord_pair x y ∈ f → y = f @@ hx := 
+ord_pair x y ∈ f → y = eval f hx := 
 begin
 	intro h,
 	cases eval_spec f hx with hord hpair,
@@ -1706,7 +1704,7 @@ begin
 end
 
 lemma eval_behaves (f : Set) {x : Set} [set_function f] (hx1 : x ∈ domain f) 
-(hx2 : x ∈ domain f) : f @@ hx1 = f @@ hx2 :=
+(hx2 : x ∈ domain f) : eval f hx1 = eval f hx2 :=
 begin 
 	have h1 := eval_spec f hx1,
 	have h2 := eval_spec f hx2,
@@ -1716,7 +1714,7 @@ begin
 end
 
 lemma mem_range_iff_eval (f : Set) [set_function f] : ∀⦃y⦄, y ∈ range f ↔
- ∃(x : Set) (hx : x ∈ domain f), y = f @@ hx :=
+ ∃(x : Set) (hx : x ∈ domain f), y = eval f hx :=
 begin 
 	intro y,
 	split,
@@ -1747,9 +1745,31 @@ begin
 	},
 end
 
-def injective (f : Set) [set_function f] := 
-∀⦃x y⦄ {hxf : x ∈ domain f} {hyf : y ∈ domain f}, f @@ hxf = f @@ hyf →
-x = y
+def injective (f : Set) := 
+∀⦃x x' y⦄, 
+ord_pair x y ∈ f → ord_pair x' y ∈ f → x = x'
+
+lemma injective_iff (f : Set) [set_function f] : injective f ↔ ∀⦃x y⦄ 
+{hxf : x ∈ domain f} {hyf : y ∈ domain f}, eval f hxf = eval f hyf →
+x = y :=
+begin 
+	split,
+	{
+		intros h x y hxf hyf hf,
+		cases eval_spec f hxf with hf1 hf2,
+		cases eval_spec f hyf with hf3 hf4,
+		rw← hf at hf4,
+		exact h hf2 hf4,
+	},
+	{
+		intros h x x' y hxy hxy',
+		have hxf := mem_domain_pair hxy,
+		have hxf' := mem_domain_pair hxy',
+		have := eval_unique f hxf' hxy',
+		rw eval_unique f hxf hxy at this,
+		exact h this,
+	},
+end
 
 structure full_func (f : Set) extends set_function f :=
 (codomain : Set)
@@ -1780,6 +1800,7 @@ end
 lemma inv_of_inj_is_func (f : Set) [f_func : set_function f]
 (f_inj : injective f) : set_function (inv f) :=
 begin
+	rw injective_iff at f_inj,
 	apply set_func_of_is_set_func,
 	intros p hp,
 	rw mem_inv at hp,
@@ -1816,23 +1837,6 @@ begin
 	},
 end
 
-structure bijection (f : Set) extends full_func f :=
-(injective : injective f)
-(surjective : surjective f)
-
-attribute [class] bijection
-
-structure equiv (x y : Set) :=
-(f : Set)
-[f_bi : bijection f]
-(domain : domain f = x)
-(codomain : f_bi.codomain = y)
-
-attribute [class] equiv
-
-def same_card (x y : Set) := 
-∃(f : Set) [f_bi : bijection f], domain f = x ∧ f_bi.codomain = y
-
 lemma restricted_replacement (φ : relation) {X : Set} [φ_func : class_function_on_set φ X] :
 ∃B : Set, ∀z, z ∈ B ↔ ∃x ∈ X, φ x z := 
 begin 
@@ -1852,7 +1856,7 @@ begin
 			{
 				intros y' hy',
 				cases hy',
-				{exact hy.2 y' hy'.2},
+				{exact hy.2 hy'.2},
 				{finish},
 			},
 		},
@@ -2086,7 +2090,7 @@ begin
 end
 
 lemma domain_of_comp (g f : Set) [set_function f] [set_function g] : 
-domain (g ∘ f) = { x ∈ domain f | ∃hx : x ∈ domain f, f @@ hx ∈ domain g} :=
+domain (g ∘ f) = { x ∈ domain f | ∃hx : x ∈ domain f, eval f hx ∈ domain g} :=
 begin 
 	ext x,
 	split,
@@ -2115,7 +2119,7 @@ begin
 		cases hgx with z hz,
 		use z,
 		rw mem_comp,
-		use [x, (f @@ hx), z, rfl],
+		use [x, (eval f hx), z, rfl],
 		split,
 		{
 			cases eval_spec f hx with y hy,
@@ -2126,14 +2130,6 @@ begin
 		},
 	},
 end
-
-
--- lemma eval_comp {g f : Set} [set_function f] [set_function g] {x : Set} (hxf : x ∈ domain f) 
--- (hfg : range f ⊆ domain g) :
---  @eval (g ∘ f) x (comp_is_func g f) hxf = eval g () := 
--- begin 
-
--- end
 
 
 structure set_relation (r : Set) :=
@@ -2164,14 +2160,14 @@ def func_of_set_function (f : Set) [set_function f] : Set → Set :=
 begin 
 	intro x,
 	by_cases x ∈ domain f,
-	exact f @@ h,
+	exact eval f h,
 	exact ∅,
 end
 
 structure order_isomorphism (X Y f : Set) (r_x r_y : relation) [set_function f] :=
 (f_inj : injective f)
 (f_surj : range f = Y)
-(morph : ∀⦃a b⦄ (ha : a ∈ domain f) (hb : b ∈ domain f), r_x a b ↔ r_y (f @@ ha) (f @@ hb))
+(morph : ∀⦃a b⦄ (ha : a ∈ domain f) (hb : b ∈ domain f), r_x a b ↔ r_y (eval f ha) (eval f hb))
 
 lemma pair_union_ordinal {a b : Set} (ha : ordinal a) (hb : ordinal b) : ordinal (a ∪ b) :=
 begin 
@@ -2418,12 +2414,22 @@ prefix `𝒫 ` := powerset
 @[simp] def mem_powerset (x : Set) : 
 ∀y, y ∈ 𝒫 x ↔ y ⊆ x := classical.some_spec (powerset_exits x)
 
+infix ` ≼` :50 := λ A B, ∃(f : Set) [set_function f], injective f
+
+structure bijection (f A B : Set) :=
+[f_func : set_function f]
+(f_domain : domain f = A)
+(f_range : range f = B)
+(f_injective : injective f)
+
+infix ` ≺ `:50 := λ A B, (∃(f : Set) [set_function f], injective f) ∧
+¬∃(f : Set) [bijection f A B], true 
 
 theorem cantors_theorem (A f : Set) [set_function f] (hfA : domain f = A) : 
 ¬ 𝒫 A ⊆ range f :=
 begin 
 	intro h,
-	let B := {x ∈ A | ∃(hx : x ∈ domain f), x ∉ f @@ hx},
+	let B := {x ∈ A | ∃(hx : x ∈ domain f), x ∉ eval f hx},
 	have hB : B ∈ 𝒫 A,
 	{
 		rw mem_powerset,
@@ -2471,5 +2477,387 @@ begin
 	},
 	exact (not_iff_self (x ∈ B)).mp (iff.symm this),
 end
+
+def eval_class (φ : relation) [φ_func : class_function φ] (x : Set) := 
+classical.some (φ_func.is_func x)
+
+infix ` @@ `:1000 := eval_class
+
+lemma eval_class_spec (φ : relation) [φ_func : class_function φ] (x : Set)
+: φ x (φ @@ x) ∧ ∀ (z : Set), φ x z → (φ @@ x = z) := 
+classical.some_spec (φ_func.is_func x)
+
+def class_restriction (φ : relation) [φ_func : class_function φ] 
+(A : Set) := {p ∈ A | ∃b a, p = ord_pair a b ∧ φ a b}
+
+lemma func_class_restriciton (φ : relation) [φ_func : class_function φ] 
+(A : Set) : set_function (class_restriction φ A) :=
+begin 
+	fconstructor,
+	intros x hx,
+	unfold class_restriction at hx,
+	rw mem_sep at hx,
+	rcases hx with ⟨hxA, b, a, hx⟩,
+	use [b, a, hx.1],
+
+	intros c hc,
+	unfold class_restriction at hc,
+	rw mem_sep at hc,
+	rcases hc with ⟨hcA, b', a', hc1, hc2⟩,
+	rw ord_pair_eq_iff at hc1,
+	rw [←hc1.1, ← hc1.2] at hc2,
+
+	rcases φ_func.is_func a with ⟨y, hy1, hy2⟩,
+	have hyc := hy2 hc2,
+	have hyb := hy2 hx.2,
+	rw [←hyc, ←hyb],
+end
+
+
+open_locale classical
+
+def eval_full_set (f x : Set) : Set :=
+if h : is_set_function f ∧ x ∈ domain f then 
+@eval f x (set_func_of_is_set_func h.1) h.2
+else ∅
+
+infix ` @@ `:1000 := eval_full_set
+
+lemma eval_in (f x : Set) [hf : set_function f] (hx : x ∈ domain f) : 
+f @@ x = @eval f x hf hx := dif_pos (and.intro hf.is_func hx)
+
+lemma eval_out (f x : Set) (h : ¬(is_set_function f ∧ x ∈ domain f)) : f @@ x = ∅ := 
+dif_neg h
+
+lemma domain_of_restriction (f A : Set) [set_function f] : 
+domain (set_restriction f A) = domain f ∩ A :=
+begin 
+	ext x,
+	split,
+	{
+		intro h,
+		rw mem_pair_inter,
+		rw mem_domain at *,
+		cases h with b hb,
+		rw mem_restriction at hb,
+		rcases hb.2 with ⟨x', h', hb_2⟩,
+		rw ord_pair_eq_iff at hb_2,
+		cases hb_2 with hb_1 hb_2,
+		rw← hb_2.1 at hb_1,
+		use [b, hb.1, hb_1],
+	},
+	{
+		intro h,
+		rw mem_pair_inter at h,
+		rw mem_domain at *,
+		cases h.1 with b hb,
+		use b,
+		rw mem_restriction,
+		use [hb, x, b, h.2],
+	},
+end
+
+lemma domain_of_restriction_ss (f : Set) {A : Set} (hA : A ⊆ domain f) [set_function f] : 
+domain (set_restriction f A) = A :=
+begin 
+	rw domain_of_restriction f A,
+	rw eq_iff_subsets,
+	use pair_inter_subset_right (domain f) A,
+
+	intros a ha,
+	rw mem_pair_inter,
+	exact ⟨hA ha, ha⟩,
+end
+
+lemma func_ext {f g : Set} [set_function f] [set_function g] (hfg : domain f = domain g) : 
+f = g ↔ ∀⦃x⦄, 
+x ∈ domain f → f @@ x = g @@ x :=
+begin 
+	split,
+	{tauto,},
+	{
+		intro h,
+		ext p,
+		split,
+		{
+			intro hpf,
+			rcases _inst_1.is_func hpf with ⟨b, a, p⟩,
+			rw p.1 at hpf,
+			have := h (mem_domain_pair hpf),
+			have := eval_in f a (mem_domain_pair hpf),
+			sorry,
+		},
+		sorry,
+	},
+end
+
+@[simp]lemma ord_not_le_iff (α β : Set) [ordinal α] [ordinal β] : ¬α ≤ β ↔ β < α :=
+begin 
+	split,
+	{
+		intro h,
+		unfold has_lt.lt,
+		exact ord_not_le h,
+	},
+	{
+		intros h,
+		unfold has_le.le,
+		unfold has_lt.lt at h,
+		push_neg,
+		by_contra h',
+		push_neg at h',
+		have := h' (not_ord_mem_ord _inst_2 h),
+		rw this at h,
+		exact not_ord_mem_ord _inst_2 h h,
+	},
+end
+
+@[simp]lemma ord_not_lt_iff (α β : Set) [ordinal α] [ordinal β] : ¬α < β ↔ β ≤ α :=
+begin 
+	rw ← ord_not_le_iff,
+	simp,
+end
+
+lemma transfinite_induction (φ : fclass) (α : Set) [ordinal α] (hα : φ α) :
+ ∃(γ : Set)[ordinal γ], φ γ ∧ ∀(ξ : Set) [ordinal ξ], φ ξ → γ ≤ ξ :=
+begin 
+	let X := {β ∈ α | φ β},
+	by_cases hX : X = ∅,
+	{
+		use [α, _inst_1, hα],
+		intros ξ ξ_ord hξ,
+		by_contra,
+		rw @ord_not_le_iff α ξ _inst_1 ξ_ord at h,
+		have contra : ξ ∈ X,
+		{
+			rw mem_sep,
+			unfold has_lt.lt at h,
+			exact ⟨h, hξ⟩,
+		},
+		rw hX at contra,
+		exact (mem_empty ξ).mp contra,
+	},
+	{
+		have X_ord_class : subset_class X ON,
+		{
+			intros β hβ,
+			rw mem_sep at hβ,
+			exact mem_of_ordinal_is_ordinal (mem_ON_of_ord _inst_1) hβ.1,
+		},
+
+		rcases ON_ordinal_class.wo.wf X_ord_class hX with ⟨β, hβX, hβ⟩,
+		have β_ord := ord_of_mem_ON (X_ord_class hβX),
+		use [β, β_ord],
+		rw mem_sep at hβX,
+		use hβX.2,
+		intros ξ ξ_ord hξ,
+		by_contra,
+		rw @ord_not_le_iff β ξ β_ord ξ_ord at h,
+		unfold has_lt.lt at h,
+		have hξα := _inst_1.tran hβX.1 h,
+		have hξX : ξ ∈ X,
+		{
+			rw mem_sep,
+			exact ⟨hξα, hξ⟩,
+		},
+
+		exact (hβ hξX) h,
+	},
+end
+
+lemma restriction_agrees (f X : Set) [set_function f] {x : Set} (hxX : x ∈ X) :
+f @@ x = set_restriction f X @@ x := 
+begin 
+	have rest_func := is_func_restriction f X,
+	by_cases x ∈ domain f,
+	{
+		rw eval_in f x h,
+		have hx_rest : x ∈ domain (set_restriction f X),
+		{
+			rw domain_of_restriction,
+			rw mem_pair_inter,
+			exact ⟨h, hxX⟩,
+		},
+		rw @eval_in (set_restriction f X) x rest_func hx_rest,
+		rw mem_domain at h,
+		cases h with y hy,
+
+		rw mem_domain at hx_rest,
+		cases hx_rest with y' hy',
+		rw mem_restriction at hy',
+
+		have := func_out_unique hy hy'.1,
+
+		rw ←eval_unique f h hy,
+		rcases hy' with ⟨hyf', a, b, hab⟩,
+		rw ord_pair_eq_iff at hab,
+		cases hab with haX ha,
+		rw ←ha.1 at haX,
+
+		have pair_rest : ord_pair x y ∈ (set_restriction f X),
+		{
+			rw mem_restriction,
+			use [hy, x, y, haX],
+		},
+
+		exact @eval_unique (set_restriction f X) x rest_func hx_rest y pair_rest,
+	},
+	{
+		rw eval_out f x (not_and_of_not_right (is_set_function f) h),
+		have h2 : x ∉ domain (set_restriction f X),
+		{
+			intro h',
+			rw domain_of_restriction at h',
+			rw mem_pair_inter at h',
+			exact h h'.1,
+		},
+		rw eval_out (set_restriction f X) x 
+		(not_and_of_not_right (is_set_function (set_restriction f X)) h2),
+	},
+end
+
+lemma nonempty_of_has_mem {x y: Set} (h : y ∈ x) : x ≠ ∅ :=
+begin 
+	intro hx,
+	rw hx at h,
+	simp at h,
+	exact h,
+end
+
+theorem primitive_recursion (φ : relation) [class_function φ] :
+∃(ψ : relation) [ψ_func : class_function ψ], ∀⦃ξ : Set⦄ [ordinal ξ], 
+(@eval_class ψ ψ_func ξ) = φ @@ (@class_restriction ψ ψ_func ξ) :=
+begin 
+	let App := λδ h, δ ∈ ON ∧ domain h = δ ∧ 
+	∃(h_func : set_function h), ∀⦃ξ⦄, ξ ∈ δ → h @@ ξ = φ @@ (set_restriction h ξ),
+	
+	let ψ := λx y, (x ∉ ON ∧ y = ∅) ∨ (x ∈ ON ∧ ∃(h δ : Set),
+	 x ∈ δ ∧ App δ h ∧ h @@ x = y),
+
+	have U : ∀h h' δ δ', δ ∈ ON → δ' ∈ ON → δ ≤ δ' → App δ h → App δ' h' →
+	h = set_restriction h' δ,
+	{
+		intros h h' δ δ' δ_ord δ'_ord hδδ' hhδ hhδ',
+
+		rcases hhδ.2.2 with ⟨h_func, h_aprox⟩,
+		rcases hhδ'.2.2 with ⟨h'_func, h'_aprox⟩,
+		have h_dom := hhδ.2.1,
+		have h'_dom := hhδ'.2.1,
+
+		have hh'_dom : domain h = domain (set_restriction h' δ),
+		{
+			have : δ ⊆ domain h',
+			{
+				rw h'_dom,
+				rwa ord_le_iff_subset,
+				exact δ_ord, exact δ'_ord,
+			}, 
+			have := @domain_of_restriction_ss h' δ this h'_func,
+			finish,
+		},
+		have h'_rest_func := (@is_func_restriction h' δ h'_func),
+		rw @func_ext h (set_restriction h' δ) h_func h'_rest_func hh'_dom,
+
+		intros ξ hξh,
+
+		have hξh' : ξ ∈ domain (set_restriction h' δ) := by rwa ← hh'_dom,
+		rw h_dom at *,
+		rw h_aprox hξh,
+		have hξδ' : ξ ∈ δ',
+		{
+			unfold has_le.le at hδδ',
+			cases hδδ',
+			{
+				exact (ord_of_mem_ON δ'_ord).tran hδδ' hξh,
+			},
+			{
+				rw← hδδ',
+				exact hξh,
+			},
+		},
+		have := h'_aprox hξδ',
+		suffices rest_eq : set_restriction h ξ = set_restriction h' ξ,
+		{
+			rw rest_eq,
+			rw ←this,
+			exact @restriction_agrees h' δ h'_func ξ hξh,
+		},
+		let X := {δ ∈ ξ | h @@ δ ≠ h' @@ δ},
+		suffices X_empty : X = ∅,
+		{
+			have h_rest_dom : domain (set_restriction h ξ) = ξ,
+			{sorry},
+			have h'_rest_dom : domain (set_restriction h' ξ) = ξ,
+			{sorry},
+			have obv : domain (set_restriction h ξ) = domain (set_restriction h' ξ) := 
+			(rfl.congr (eq.symm h'_rest_dom)).mp h_rest_dom,
+
+			rw @func_ext (set_restriction h ξ) (set_restriction h' ξ) 
+			(@is_func_restriction h ξ h_func) (@is_func_restriction h' ξ h'_func) obv,
+			rw h_rest_dom,
+
+			intros δ hδ,
+			by_contra hcontra,
+			rw← @restriction_agrees h ξ h_func δ hδ at hcontra,
+			rw← @restriction_agrees h' ξ h'_func δ hδ at hcontra,
+			have contra : δ ∈ X,
+			{
+				rw mem_sep,
+				exact ⟨hδ, hcontra⟩,
+			},
+			rw X_empty at contra,
+			exact (mem_empty δ).mp contra,
+		},
+
+		have ξ_ord : ξ ∈ ON := mem_of_ordinal_is_ordinal δ_ord hξh,
+
+		by_contra X_nonempty,
+		have X_ON_set : subset_class X ON,
+		{
+			intros α hα,
+			rw mem_sep at hα,
+			exact mem_of_ordinal_is_ordinal ξ_ord hα.1,
+		},
+
+		rcases ON_ordinal_class.wo.wf X_ON_set X_nonempty with ⟨γ, hγX, hγ_min⟩,
+		have γ_ord := ord_of_mem_ON (X_ON_set hγX),
+		by_cases hγ : is_limit γ_ord,
+		{
+			sorry,
+		},
+		{
+			unfold is_limit at hγ,
+			push_neg at hγ,
+			have temp : γ ≠ ∅,
+			{
+				intro hcontra,
+				rw mem_sep at hγX,
+				rw hcontra at hγX,
+				apply hγX.2,
+				have rest_to_empty : ∀x, set_restriction x ∅ = ∅,
+				{
+					intro x,
+					rw← subset_empty_iff,
+					intros y hy,
+					rw mem_restriction at hy,
+					rcases hy with ⟨a, a, aa, ha⟩,
+					exfalso,
+					simp at ha,
+					exact ha,
+				},
+				have δ_has_empty := ord_contains_empty (ord_of_mem_ON δ_ord) (nonempty_of_has_mem hξh),
+				have δ'_has_empty := ord_contains_empty (ord_of_mem_ON δ'_ord) (nonempty_of_has_mem hξδ'),
+				rw h_aprox δ_has_empty,
+				rw h'_aprox δ'_has_empty,
+				rw [rest_to_empty, rest_to_empty],
+			},
+
+			rcases hγ temp with ⟨α, α_ord, hα⟩,
+			sorry,
+		},
+	},
+	sorry,
+end
+
 
 end test
