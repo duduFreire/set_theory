@@ -1749,7 +1749,7 @@ def injective (f : Set) :=
 ∀⦃x x' y⦄, 
 ord_pair x y ∈ f → ord_pair x' y ∈ f → x = x'
 
-lemma injective_iff (f : Set) [set_function f] : injective f ↔ ∀⦃x y⦄ 
+lemma injective_iff_bad (f : Set) [set_function f] : injective f ↔ ∀⦃x y⦄ 
 {hxf : x ∈ domain f} {hyf : y ∈ domain f}, eval f hxf = eval f hyf →
 x = y :=
 begin 
@@ -1800,7 +1800,7 @@ end
 lemma inv_of_inj_is_func (f : Set) [f_func : set_function f]
 (f_inj : injective f) : set_function (inv f) :=
 begin
-	rw injective_iff at f_inj,
+	rw injective_iff_bad at f_inj,
 	apply set_func_of_is_set_func,
 	intros p hp,
 	rw mem_inv at hp,
@@ -2073,7 +2073,7 @@ begin
 	exact h2 hxy',
 end
 
-lemma comp_is_func (g f : Set) [set_function f] [set_function g] :
+lemma comp_is_func (g f : Set) [set_function g] [set_function f] :
 set_function (g ∘ f) :=
 begin 
 	apply set_func_of_is_set_func,
@@ -2089,7 +2089,7 @@ begin
 	exact func_out_unique hyzg hy'.2,
 end
 
-lemma domain_of_comp (g f : Set) [set_function f] [set_function g] : 
+lemma domain_of_comp_bad (g f : Set) [set_function g] [set_function f]  : 
 domain (g ∘ f) = { x ∈ domain f | ∃hx : x ∈ domain f, eval f hx ∈ domain g} :=
 begin 
 	ext x,
@@ -3088,9 +3088,34 @@ begin
 	exact this.2.2,
 end
 
+structure ordered_set :=
+(set : Set)
+(r : relation)
+
+instance : has_mem Set ordered_set := ⟨λx y, x ∈ y.set⟩
+
 structure order_isomorphism (f A : Set) (rA : relation) (B : Set) (rB : relation)
 extends bijection f A B :=
 (f_isomorphism : ∀⦃a1 a2⦄, a1 ∈ A → a2 ∈ A → (rA a1 a2 ↔ rB (f @@ a1) (f @@ a2)))
+
+def gen_relation (α β : Type*) := α → β → Prop
+
+def gen_relation_refl {α : Type*} (r : gen_relation α α) : Prop :=
+∀x : α, r x x
+
+def gen_relation_symm {α : Type*} (r : gen_relation α α) : Prop :=
+∀⦃x y : α⦄, r x y → r y x
+
+def gen_relation_tran {α : Type*} (r : gen_relation α α) : Prop :=
+∀⦃x y z : α⦄, r x y → r y z → r x z
+
+structure gen_equiv_relation {α : Type*} (r : gen_relation α α) := 
+(refl : gen_relation_refl r)
+(symm : gen_relation_symm r)
+(tran : gen_relation_tran r)
+
+def order_isomorphic : gen_relation ordered_set ordered_set  :=
+λ A B, ∃f (f_iso : order_isomorphism f A.set A.r B.set B.r), true
 
 theorem ord_isomorphism_is_trivial (α β : Set) [ordinal α] [ordinal β] 
 (f : Set) (f_iso : order_isomorphism f α (∈) β (∈)) : f = identity α :=
@@ -3243,7 +3268,7 @@ begin
 	},
 end
 
-lemma ord_isomorphism_self (X : Set) (rX: relation) : 
+lemma ord_isomorphism_self (X : Set) (rX : relation) : 
 order_isomorphism (identity X) X rX X rX :=
 {
 
@@ -3671,9 +3696,229 @@ lemma inverse_order_isomorphism {f A B : Set} {rA rB : relation}
 	end
 }
 
+lemma domain_comp {g f : Set} (f_func : set_function f) (g_func : set_function g) : 
+domain (g ∘ f) = { x ∈ domain f | f @@ x ∈ domain g} := 
+begin 
+	rw domain_of_comp_bad,
+	ext x,
+	rw [mem_sep, mem_sep],
+	split,
+	{
+		intro h,
+		rcases h with ⟨hxf1, hxf2, hx_eval⟩,
+		use hxf1,
+		rwa func_in f_func hxf2,
+	},
+	{
+		intro h,
+		use [h.1, h.1],
+		rw← func_in f_func h.1,
+		exact h.2,
+	},
+end
+
+lemma eval_comp {g f x : Set} (g_func : set_function g) (f_func : set_function f)
+ (hx : x ∈ domain (g ∘ f)) : (g ∘ f) @@ x = g @@ (f @@ x) :=
+begin
+	have hx2 : x ∈ domain f ∧ f @@ x ∈ domain g,
+	{
+		rwa [domain_comp, mem_sep] at hx;
+		assumption,
+	},
+
+	have h := @func_spec (g ∘ f) x (comp_is_func g f) hx,
+
+	rw mem_comp_pair at h,
+	rcases h with ⟨y, hxyf, hy⟩,
+	rw func_unique f_func hxyf at hy,
+	exact func_unique g_func hy,
+end
+
+lemma domain_comp' {g f : Set} (g_func : set_function g)
+(f_func : set_function f) (hfg : range f = domain g) : 
+domain (g ∘ f) = domain f :=
+begin 
+	rw domain_comp f_func g_func,
+	ext x,
+	rw mem_sep,
+	split,
+	{
+		intro h, exact h.1,
+	},
+	{
+		intro h, use h,
+		rw← hfg,
+		exact func_mem_range f_func h,
+	},
+end
+
+lemma mem_range_iff {f : Set} (f_func :set_function f) : ∀⦃y⦄, y ∈ range f ↔
+ ∃(x : Set) (hx : x ∈ domain f), y = f @@ x :=
+ begin 
+	 intros y,
+	 rw mem_range_iff_eval,
+	 split,
+	 {
+		 intro h,
+		 rcases h with ⟨x, hx, hxy⟩,
+		 use [x, hx],
+		 rw hxy,
+		 exact eq.symm (func_in f_func hx),
+	 },
+	 {
+		intro h,
+		rcases h with ⟨x, hx, hxy⟩,
+		use [x, hx],
+		rw hxy,
+		exact (func_in f_func hx),
+	 }
+ end
+
+lemma range_comp' {g f : Set} (g_func : set_function g)
+(f_func : set_function f) (hfg : range f = domain g) :
+ range (g ∘ f) = range g :=
+begin 
+	ext z,
+	rw mem_range_iff (comp_is_func g f),
+	split,
+	{
+		intro h,
+		rcases h with ⟨x, hx, hxz⟩,
+		rw hxz,
+		rw eval_comp g_func f_func hx,
+		rw domain_comp' g_func f_func hfg at hx,
+		have := func_mem_range f_func hx,
+		rw hfg at this,
+		exact func_mem_range g_func this,
+	},
+	{
+		intro h,
+		rw mem_range_iff g_func at h,
+		rcases h with ⟨y, hy, hyz⟩,
+		rw← hfg at hy,
+		rw mem_range_iff f_func at hy,
+		rcases hy with ⟨x, hx, hxy⟩,
+		rw domain_comp' g_func f_func hfg,
+		use [x, hx],
+		rw [hyz, hxy],
+		rw← domain_comp' g_func f_func hfg at hx,
+		exact eq.symm (eval_comp g_func f_func hx),
+	},
+end
+
+lemma injective_iff {f : Set} (f_func : set_function f) : injective f ↔ ∀⦃x y⦄ 
+(hxf : x ∈ domain f) (hyf : y ∈ domain f), f @@ x = f @@ y →
+x = y :=
+begin 
+	rw injective_iff_bad,
+	split,
+	{
+		intros h x x' hx hx' hxx',
+		rw func_in f_func hx at hxx',
+		rw func_in f_func hx' at hxx',
+		exact h hxx',
+	},
+	{
+		intros h x x' hx hx' hxx',
+		rw← func_in f_func hx at hxx',
+		rw← func_in f_func hx' at hxx',
+		exact h hx hx' hxx',
+	},
+end
+
+lemma comp_inj {g f : Set} (g_func : set_function g)
+(f_func : set_function f) (g_inj : injective g) (f_inj : injective f) 
+(hfg : range f = domain g) : injective (g ∘ f) :=
+begin 
+	rw injective_iff (comp_is_func g f),
+	rw injective_iff g_func at g_inj,
+	rw injective_iff f_func at f_inj,
+
+	intros x y hx hy hxy,
+	rw [eval_comp g_func f_func hx, eval_comp g_func f_func hy] at hxy,
+	rw domain_comp' g_func f_func hfg at hx hy,
+	have := @g_inj (f @@ x) (f @@ y) _ _ hxy,
+	{
+		exact f_inj hx hy this,
+	},
+	{
+		rw← hfg,
+		exact func_mem_range f_func hx,
+	},
+	{
+		rw← hfg,
+		exact func_mem_range f_func hy,
+	},
+end
+
+lemma order_ismorphism_comp {f g A B C : Set} {rA rB rC : relation} 
+(f_iso : order_isomorphism f A rA B rB) (g_iso : order_isomorphism g B rB C rC) 
+: order_isomorphism (g ∘ f) A rA C rC := {
+	f_func := @comp_is_func g f g_iso.f_func f_iso.f_func,
+	f_domain := 
+	begin
+		rw domain_comp' g_iso.f_func f_iso.f_func,
+		{exact f_iso.f_domain},
+		{rw [f_iso.f_range, g_iso.f_domain]},
+	end,
+	f_range :=
+	begin 
+		rw range_comp' g_iso.f_func f_iso.f_func,
+		{exact g_iso.f_range},
+		{rw [f_iso.f_range, g_iso.f_domain]},
+	end,
+	f_injective := 
+	begin
+		apply comp_inj g_iso.f_func f_iso.f_func g_iso.f_injective f_iso.f_injective,
+		rw [f_iso.f_range, g_iso.f_domain],
+	end,
+	f_isomorphism :=
+	begin 
+		 intros a1 a2 ha1 ha2,
+		 have hfg : range f = domain g := by rw [f_iso.f_range, g_iso.f_domain],
+
+		 rw[←f_iso.f_domain, ←domain_comp' g_iso.f_func f_iso.f_func hfg] at ha1 ha2,
+		 rw [eval_comp g_iso.f_func f_iso.f_func ha1, 
+		 eval_comp g_iso.f_func f_iso.f_func ha2],
+		 
+		 rw domain_comp' g_iso.f_func f_iso.f_func hfg at ha1 ha2,
+		 have hfB : f @@ a1 ∈ B ∧ f @@ a2 ∈ B,
+		 {
+			 rw← f_iso.f_range,
+			 exact ⟨func_mem_range f_iso.f_func ha1, func_mem_range f_iso.f_func ha2⟩,
+		 },
+		 rw← g_iso.f_isomorphism hfB.1 hfB.2,
+		 rw f_iso.f_domain at ha1 ha2,
+
+		 exact f_iso.f_isomorphism ha1 ha2,
+	end
+}
+
+
+lemma order_isomorphism_equiv : gen_equiv_relation order_isomorphic :=
+begin 
+	fconstructor,
+	{
+		intros X,
+		use [identity X.set, ord_isomorphism_self X.set X.r],
+	},
+	{
+		intros X Y XY_iso,
+		rcases XY_iso with ⟨f, f_iso, -⟩,
+		use [inv f, inverse_order_isomorphism f_iso],
+	},
+	{
+		intros X Y Z hXY hYZ,
+		rcases hXY with ⟨f, f_iso, -⟩,
+		rcases hYZ with ⟨g, g_iso, -⟩,
+		use g ∘ f,
+		use order_ismorphism_comp f_iso g_iso,
+	},
+end
+
 lemma order_isomorphism_preserves_minimal (f A B : Set) (rA rB : relation) 
-(f_iso : order_isomorphism f A rA B rB) {a : Set} {haA : a ∈ A} (ha : minimal rA haA) : 
-∃hfa : f @@ a ∈ B, minimal rB hfa :=
+(f_iso : order_isomorphism f A rA B rB) {a : Set} {haA : a ∈ A} 
+(ha : minimal rA haA) : ∃hfa : f @@ a ∈ B, minimal rB hfa :=
 begin 
 	rw← f_iso.f_range,
 	have ha_dom : a ∈ domain f := by rwa← f_iso.f_domain at haA,
@@ -3697,13 +3942,11 @@ begin
 	exact ha hxA hyfa,
 end
 
-def order_ismorphic (A : Set) (rA : relation) (B : Set) (rB : relation)  : Prop :=
-∃f (f_iso : order_isomorphism f A rA B rB), true
-
 theorem wo_isomorphic_ordinal {A : Set} {R : relation} (A_wo : well_order A R) :
-∃! (α : Set), α ∈ ON ∧ order_ismorphic α (∈) A R :=
+∃! (α : Set), α ∈ ON ∧ order_isomorphic (ordered_set.mk α (∈)) (ordered_set.mk A R) :=
 begin
-	suffices h_exists : ∃(α : Set) (α_ord : ordinal α), order_ismorphic α (∈) A R,
+	suffices h_exists : ∃(α : Set) (α_ord : ordinal α), 
+	order_isomorphic (ordered_set.mk α (∈)) (ordered_set.mk A R),
 	{
 		unfold exists_unique,
 		rcases h_exists with ⟨α, α_ord, hα⟩,
