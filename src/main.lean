@@ -2478,12 +2478,179 @@ classical.some (φ_func.is_func x)
 
 infix ` @@ `:1000 := eval_class
 
-lemma eval_class_spec (φ : relation) [φ_func : class_function φ] (x : Set)
-: φ x (φ @@ x) ∧ ∀ (z : Set), φ x z → (φ @@ x = z) := 
+lemma func_class_spec {φ : relation} (φ_func : class_function φ) (x : Set)
+: φ x (φ @@ x) ∧ ∀ {z : Set}, φ x z → (φ @@ x = z) := 
 classical.some_spec (φ_func.is_func x)
+
+lemma func_class_unique {φ : relation} (φ_func : class_function φ) : 
+∀x y, φ x y ↔ φ @@ x = y :=
+begin 
+	intros x y,
+	split,
+	{
+		intro h,
+		cases func_class_spec φ_func x with hφx h2,
+		exact h2 h,
+	},
+	{
+		intro h,
+		cases func_class_spec φ_func x with hφx h2,
+		rcases φ_func.is_func x with ⟨y', hy', hu⟩,
+		specialize hu hφx,
+		rw← hu at h,
+		rwa h at hy',
+	},
+end
 
 def class_restriction (φ : relation) [φ_func : class_function φ] 
 (A : Set) := {p ∈ A | ∃b a, p = ord_pair a b ∧ φ a b}
+
+def class_injective_at {φ : relation} (φ_func : class_function φ) (F : fclass)
+: Prop :=  ∀⦃x x'⦄, x ∈ F → x' ∈ F → φ @@ x = φ @@ x' → x = x'
+
+lemma class_injective_at_iff (φ : relation) (φ_func : class_function φ) (F : fclass) :
+class_injective_at φ_func F ↔ ∀⦃x x' y⦄, x ∈ F → x' ∈ F → φ x y → φ x' y → x = x' :=
+begin 
+	split,
+	{
+		intros h x x' y hxF hx'F hxy hx'y,
+		rw func_class_unique φ_func at hxy hx'y,
+		rw← hx'y at hxy,
+		exact h hxF hx'F hxy,
+	},
+	{
+		intros h x x' hxF hx'F hxx',
+		have hx := func_class_spec φ_func x, 
+		have hx' := func_class_spec φ_func x', 
+		have := h hxF hx'F hx.1,
+		rw hxx' at this,
+		exact this hx'.1,
+	},
+end
+
+def class_injection {φ : relation} (φ_func : class_function φ) : Prop :=
+ ∀⦃x x'⦄, φ @@ x = φ @@ x' → x = x'
+
+lemma class_injection_iff (φ : relation) (φ_func : class_function φ) :
+class_injection φ_func ↔ ∀⦃x x' y⦄, φ x y → φ x' y → x = x' :=
+begin 
+	split,
+	{
+		intros h x x' y hxy hx'y,
+		rw func_class_unique φ_func at hxy hx'y,
+		rw← hx'y at hxy,
+		exact h hxy,
+	},
+	{
+		intros h x x' hxx',
+		have h1 := func_class_spec φ_func x,
+		have h2 := func_class_spec φ_func x',
+		rw← hxx' at h2,
+		exact h h1.1 h2.1,
+	},
+end
+
+lemma class_injection_iff_univ {φ : relation} (φ_func : class_function φ) : 
+class_injection φ_func ↔ class_injective_at φ_func univ :=
+begin 
+	split,
+	{
+		intros h x x' hx hx' hxx',
+		exact h hxx',
+	},
+	{
+		intros h x x' hxx',
+		have := @h x x' _ _ hxx',
+		{exact this},
+		unfold has_mem.mem,
+		unfold has_mem.mem,
+	},
+end
+
+def class_range (φ : relation) : fclass := λy, ∃x, φ x y
+
+lemma mem_class_range {φ : relation} (φ_func : class_function φ) :
+ ∀y, y ∈ class_range φ ↔ ∃x, y = φ @@ x :=
+ begin 
+	 intros y,
+	 unfold class_range has_mem.mem mem_class,
+	 split,
+	 {
+		 intro hy,
+		 cases hy with x hx,
+		 use x,
+		 rw func_class_unique φ_func x y at hx,
+		 exact eq.symm hx,
+	 },
+	 {
+		 intro h,
+		 cases h with x hx,
+		 use x,
+		 rw hx,
+		 exact (func_class_spec φ_func x).1,
+	 },
+ end
+
+ structure class_function_on_class (φ : relation) (F : fclass) :=
+ (is_func :  ∀⦃x⦄, x ∈ F → ∃y , φ x y ∧ ∀⦃z⦄, φ x z → y = z)
+
+def class_inv (φ : relation) : relation := λx y, φ y x
+lemma class_inv_of_inj {φ : relation} {φ_func : class_function φ}
+(φ_inj : class_injection φ_func) : 
+class_function_on_class (class_inv φ) (class_range φ) :=
+begin 
+	fconstructor,
+	intros y hyF,
+	rw mem_class_range φ_func at hyF,
+	cases hyF with x hx,
+	use x,
+	unfold class_inv,
+	rw hx,
+	have := (func_class_spec φ_func x),
+	use this.1,
+	intros z hz,
+	have hyF : y ∈ class_range φ,
+	{
+		rw mem_class_range φ_func,
+		use [x, hx],
+	},
+
+	rw class_injection_iff at φ_inj,
+	exact φ_inj this.1 hz,
+end
+
+def class_range_at (φ : relation) (F : fclass) : fclass := λy, ∃x ∈ F, φ x y
+lemma class_range_at_univ (φ : relation) : 
+∀y, class_range φ y ↔ class_range_at φ univ y :=
+begin 
+	intro y,
+	unfold has_mem.mem class_range class_range_at,
+	simp,
+	unfold has_mem.mem mem_class univ,
+	simp,
+end
+
+lemma mem_class_mem_at {φ : relation} (φ_func : class_function φ) (F : fclass) :
+∀y, y ∈ class_range_at φ F ↔ ∃x ∈ F, φ @@ x = y :=
+begin 
+	intro y,
+	split,
+	unfold class_range_at has_mem.mem mem_class,
+	{
+		intro h,
+		rcases h with ⟨x, hxF, hxy⟩,
+		use [x, hxF],
+		exact (func_class_spec φ_func x).2 hxy,
+	},
+	{
+		rintro ⟨x, hxF, hxy⟩,
+		unfold class_range_at has_mem.mem mem_class,
+
+		use [x, hxF],
+		rw← hxy,
+		exact (func_class_spec φ_func x).1,
+	},
+end
 
 lemma func_class_restriciton (φ : relation) [φ_func : class_function φ] 
 (A : Set) : set_function (class_restriction φ A) :=
@@ -2754,7 +2921,7 @@ begin
 	exact h,
 end
 
-lemma func_unique_iff {f x : Set} (f_func :set_function f) (hx : x ∈ domain f) (y : Set) : 
+lemma func_unique_iff {f x : Set} (f_func : set_function f) (hx : x ∈ domain f) (y : Set) : 
 ord_pair x y ∈ f ↔ y = f @@ x :=
 begin 
 	split,
@@ -2921,12 +3088,12 @@ begin
 	exact this.2.2,
 end
 
-structure order_isomorphism (f A B : Set) (rA rB : relation)
+structure order_isomorphism (f A : Set) (rA : relation) (B : Set) (rB : relation)
 extends bijection f A B :=
 (f_isomorphism : ∀⦃a1 a2⦄, a1 ∈ A → a2 ∈ A → (rA a1 a2 ↔ rB (f @@ a1) (f @@ a2)))
 
 theorem ord_isomorphism_is_trivial (α β : Set) [ordinal α] [ordinal β] 
-(f : Set) (f_iso : order_isomorphism f α β (∈) (∈)) : f = identity α :=
+(f : Set) (f_iso : order_isomorphism f α (∈) β (∈)) : f = identity α :=
 begin
 	have : domain f = domain (identity α),
 	{
@@ -3077,7 +3244,7 @@ begin
 end
 
 lemma ord_isomorphism_self (X : Set) (rX: relation) : 
-order_isomorphism (identity X) X X rX rX :=
+order_isomorphism (identity X) X rX X rX :=
 {
 
 	f_func := identity_func X,
@@ -3092,7 +3259,7 @@ order_isomorphism (identity X) X X rX rX :=
 }
 
 lemma ordinals_isomorphic_iff_eq (α β : Set) [ordinal α] [ordinal β] :
-(∃(f : Set) [f_iso : order_isomorphism f α β (∈) (∈)], true) ↔ α = β :=
+(∃(f : Set) [f_iso : order_isomorphism f α (∈) β (∈)], true) ↔ α = β :=
 begin 
 	split,
 	{
@@ -3424,7 +3591,7 @@ begin
 end
 
 lemma inverse_order_isomorphism {f A B : Set} {rA rB : relation} 
-(iso : order_isomorphism f A B rA rB) : order_isomorphism (inv f) B A rB rA :=
+(iso : order_isomorphism f A rA B rB) : order_isomorphism (inv f) B rB A rA :=
 {
 	f_func := @inv_of_inj_is_func f iso.f_func iso.f_injective,
 	f_domain := begin 
@@ -3505,14 +3672,14 @@ lemma inverse_order_isomorphism {f A B : Set} {rA rB : relation}
 }
 
 lemma order_isomorphism_preserves_minimal (f A B : Set) (rA rB : relation) 
-(f_iso : order_isomorphism f A B rA rB) {a : Set} {haA : a ∈ A} (ha : minimal rA haA) : 
+(f_iso : order_isomorphism f A rA B rB) {a : Set} {haA : a ∈ A} (ha : minimal rA haA) : 
 ∃hfa : f @@ a ∈ B, minimal rB hfa :=
 begin 
 	rw← f_iso.f_range,
 	have ha_dom : a ∈ domain f := by rwa← f_iso.f_domain at haA,
 	use func_mem_range f_iso.f_func ha_dom,
 	unfold minimal,
-	
+
 	by_contra hcontra,
 
 	push_neg at hcontra,
@@ -3528,6 +3695,23 @@ begin
 
 	rw← f_iso.f_isomorphism hxA haA at hyfa,
 	exact ha hxA hyfa,
+end
+
+def order_ismorphic (A : Set) (rA : relation) (B : Set) (rB : relation)  : Prop :=
+∃f (f_iso : order_isomorphism f A rA B rB), true
+
+theorem wo_isomorphic_ordinal {A : Set} {R : relation} (A_wo : well_order A R) :
+∃! (α : Set), α ∈ ON ∧ order_ismorphic α (∈) A R :=
+begin
+	suffices h_exists : ∃(α : Set) (α_ord : ordinal α), order_ismorphic α (∈) A R,
+	{
+		unfold exists_unique,
+		rcases h_exists with ⟨α, α_ord, hα⟩,
+		use [α, α_ord, hα],
+		intros y hy,
+		sorry,
+	},
+	sorry,
 end
 
 theorem primitive_recursion (φ : relation) [class_function φ] :
@@ -3561,107 +3745,125 @@ begin
 			have := @domain_of_restriction_ss h' δ this h'_func,
 			finish,
 		},
+		
 		have h'_rest_func := (@is_func_restriction h' δ h'_func),
 		rw @func_ext h (set_restriction h' δ) h_func h'_rest_func hh'_dom,
-
-		intros ξ hξh,
-
-		have hξh' : ξ ∈ domain (set_restriction h' δ) := by rwa ← hh'_dom,
-		rw h_dom at *,
-		rw h_aprox hξh,
-		have hξδ' : ξ ∈ δ',
+		rw h_dom,
+		let X := {ξ ∈ δ | h @@ ξ ≠ h' @@ ξ},
+		by_cases X_empty : X = ∅,
 		{
-			unfold has_le.le at hδδ',
-			cases hδδ',
-			{
-				exact (ord_of_mem_ON δ'_ord).tran hδδ' hξh,
-			},
-			{
-				rw← hδδ',
-				exact hξh,
-			},
-		},
-		have := h'_aprox hξδ',
-		suffices rest_eq : set_restriction h ξ = set_restriction h' ξ,
-		{
-			rw rest_eq,
-			rw ←this,
-			exact @restriction_agrees h' δ h'_func ξ hξh,
-		},
-		let X := {δ ∈ ξ | h @@ δ ≠ h' @@ δ},
-		suffices X_empty : X = ∅,
-		{
-			have h_rest_dom : domain (set_restriction h ξ) = ξ,
-			{sorry},
-			have h'_rest_dom : domain (set_restriction h' ξ) = ξ,
-			{sorry},
-			have obv : domain (set_restriction h ξ) = domain (set_restriction h' ξ) := 
-			(rfl.congr (eq.symm h'_rest_dom)).mp h_rest_dom,
-
-			rw @func_ext (set_restriction h ξ) (set_restriction h' ξ) 
-			(@is_func_restriction h ξ h_func) (@is_func_restriction h' ξ h'_func) obv,
-			rw h_rest_dom,
-
-			intros δ hδ,
 			by_contra hcontra,
-			rw← @restriction_agrees h ξ h_func δ hδ at hcontra,
-			rw← @restriction_agrees h' ξ h'_func δ hδ at hcontra,
-			have contra : δ ∈ X,
+			push_neg at hcontra,
+			rcases hcontra with ⟨ξ, hξ⟩,
+			have contra : ξ ∈ X,
 			{
 				rw mem_sep,
-				exact ⟨hδ, hcontra⟩,
+				use hξ.1,
+				rw @restriction_agrees h' δ h'_func ξ hξ.1,
+				exact hξ.2,
 			},
 			rw X_empty at contra,
-			exact (mem_empty δ).mp contra,
-		},
-
-		have ξ_ord : ξ ∈ ON := mem_of_ordinal_is_ordinal δ_ord hξh,
-
-		by_contra X_nonempty,
-		have X_ON_set : subset_class X ON,
-		{
-			intros α hα,
-			rw mem_sep at hα,
-			exact mem_of_ordinal_is_ordinal ξ_ord hα.1,
-		},
-
-		rcases ON_ordinal_class.wo.wf X_ON_set X_nonempty with ⟨γ, hγX, hγ_min⟩,
-		have γ_ord := ord_of_mem_ON (X_ON_set hγX),
-		by_cases hγ : is_limit γ_ord,
-		{
-			sorry,
+			simp at contra,
+			exact contra,
 		},
 		{
-			unfold is_limit at hγ,
-			push_neg at hγ,
-			have temp : γ ≠ ∅,
+			exfalso,
+			have X_ss : X ⊆ δ,
 			{
-				intro hcontra,
-				rw mem_sep at hγX,
-				rw hcontra at hγX,
-				apply hγX.2,
-				have rest_to_empty : ∀x, set_restriction x ∅ = ∅,
-				{
-					intro x,
-					rw← subset_empty_iff,
-					intros y hy,
-					rw mem_restriction at hy,
-					rcases hy with ⟨a, a, aa, ha⟩,
-					exfalso,
-					simp at ha,
-					exact ha,
-				},
-				have δ_has_empty := ord_contains_empty (ord_of_mem_ON δ_ord) (nonempty_of_has_mem hξh),
-				have δ'_has_empty := ord_contains_empty (ord_of_mem_ON δ'_ord) (nonempty_of_has_mem hξδ'),
-				rw h_aprox δ_has_empty,
-				rw h'_aprox δ'_has_empty,
-				rw [rest_to_empty, rest_to_empty],
+				intros x hx,
+				rw mem_sep at hx,
+				exact hx.1,
 			},
+			rcases (ord_of_mem_ON δ_ord).wo.wf X_ss X_empty with ⟨ξ, hξX, ξ_min⟩,
+			rw mem_sep at hξX,
+			suffices : set_restriction h ξ = set_restriction h' ξ,
+			{
+				specialize h_aprox hξX.1,
+				rw← ord_le_iff_subset δ_ord δ'_ord at hδδ',
+				specialize h'_aprox (hδδ' hξX.1),
+				rw [h_aprox, h'_aprox, this] at hξX,
+				exact not_imp.mpr hξX (congr_fun rfl),
+			},
+			{
+				have ξ_ss_dom : ξ ⊆ domain h,
+				{
+					rw h_dom,
+					rw ord_le_iff_subset (mem_of_ordinal_is_ordinal δ_ord hξX.1) δ_ord,
+					unfold has_le.le,
+					left,
+					exact hξX.1,
+				},
+				have h_rest_dom : domain (set_restriction h ξ) = ξ := 
+				@domain_of_restriction_ss h ξ ξ_ss_dom h_func,
+				have h'_rest_dom : domain (set_restriction h' ξ) = ξ,
+				{
+					rw← ord_le_iff_subset δ_ord δ'_ord at hδδ',
+					rw h_dom at ξ_ss_dom,
+					have := subset_trans ξ_ss_dom hδδ',
+					rw← h'_dom at this,
+					exact @domain_of_restriction_ss h' ξ this h'_func,
+				},
+				have obv : domain (set_restriction h ξ) = domain (set_restriction h' ξ) := 
+				(rfl.congr (eq.symm h'_rest_dom)).mp h_rest_dom,
+				rw @func_ext (set_restriction h ξ) (set_restriction h' ξ) 
+				(@is_func_restriction h ξ h_func) (@is_func_restriction h' ξ h'_func) obv,
+				rw h_rest_dom,
+				by_contra hcontra,
+				push_neg at hcontra,
+				rcases hcontra with ⟨γ, hγ⟩,
+				have contra : γ ∈ X,
+				{
+					rw mem_sep,
+					use (ord_of_mem_ON δ_ord).tran hξX.1 hγ.1,
+					have := @restriction_agrees h ξ h_func γ hγ.1,
+					rw← this at hγ,
+					have := @restriction_agrees h' ξ h'_func γ hγ.1,
+					rw← this at hγ,
+					exact hγ.2,
+				},
+				exact ξ_min contra hγ.1,
+			},
+		},
+		
+	},
 
-			rcases hγ temp with ⟨α, α_ord, hα⟩,
+	have E : ∀⦃δ⦄, δ ∈ ON → ∃!h, App δ h,
+	{
+		sorry,
+	},
+
+	have ψ_func : class_function ψ,
+	{
+		constructor,
+		unfold is_class_function,
+		intro δ,
+		by_cases δ_ord : δ ∈ ON,
+		{
+			specialize E δ_ord,
 			sorry,
+		},
+		{
+			use ∅,
+			split,
+			{
+				left,
+				exact ⟨δ_ord, rfl⟩,
+			},
+			{
+				intros z hz,
+				cases hz,
+				{
+					exact eq.symm hz.2,
+				},
+				{
+					exfalso,
+					exact δ_ord hz.1,
+				},
+			},
 		},
 	},
+
+	use [ψ, ψ_func],
 	sorry,
 end
 
