@@ -1797,7 +1797,7 @@ begin
 	},
 end
 
-lemma inv_of_inj_is_func (f : Set) [f_func : set_function f]
+lemma inv_of_inj_is_func {f : Set} (f_func : set_function f)
 (f_inj : injective f) : set_function (inv f) :=
 begin
 	rw injective_iff_bad at f_inj,
@@ -1837,7 +1837,7 @@ begin
 	},
 end
 
-lemma restricted_replacement (φ : relation) {X : Set} [φ_func : class_function_on_set φ X] :
+lemma restricted_replacement {φ : relation} {X : Set} (φ_func : class_function_on_set φ X) :
 ∃B : Set, ∀z, z ∈ B ↔ ∃x ∈ X, φ x z := 
 begin 
 	let P := λ x y, (x ∈ X ∧ φ x y) ∨ (x ∉ X ∧ y = ∅),
@@ -1902,7 +1902,7 @@ begin
 			{exact λ {b : Set}, eq_comm.mpr},
 		},
 
-		cases @restricted_replacement φ B {is_func := φ_func} with D hD,
+		cases restricted_replacement {is_func := φ_func} with D hD,
 		use D,
 		finish,
 	},
@@ -1920,7 +1920,7 @@ begin
 			exact iff.trans (hy z_1) (iff.symm (hz z_1)),
 		},
 	},
-	cases @restricted_replacement φ A {is_func := φ_func} with F hF,
+	cases restricted_replacement {is_func := φ_func} with F hF,
 	use union F,
 	simp,
 	intros p,
@@ -1984,7 +1984,7 @@ lemma mem_restriction (f A : Set) :
  ∀x, x ∈ set_restriction f A ↔ x ∈ f ∧ ∃a b, a ∈ A ∧ x = ord_pair a b :=
 classical.some_spec (specification_axiom f (λx, ∃a b, a ∈ A ∧ x = ord_pair a b))
 
-lemma is_func_restriction (f : Set) (A : Set) [f_func : set_function f] :
+lemma is_func_restriction {f : Set} (f_func : set_function f) (A : Set) :
  set_function (set_restriction f A) := 
 begin
 	apply set_func_of_is_set_func,
@@ -2073,7 +2073,7 @@ begin
 	exact h2 hxy',
 end
 
-lemma comp_is_func (g f : Set) [set_function g] [set_function f] :
+lemma comp_is_func {g f : Set} (g_func :set_function g) (f_func : set_function f) :
 set_function (g ∘ f) :=
 begin 
 	apply set_func_of_is_set_func,
@@ -2376,12 +2376,12 @@ begin
 	},
 end
 
-axiom powersetaxiom : ∀x : Set, ∃P : Set, ∀⦃y⦄, y ⊆ x → y ∈ P
+axiom powerset_axiom : ∀x : Set, ∃P : Set, ∀⦃y⦄, y ⊆ x → y ∈ P
 
 lemma powerset_exits : ∀x : Set, ∃P : Set, ∀⦃y⦄, y ∈ P ↔ y ⊆ x :=
 begin 
 	intro x,
-	cases powersetaxiom x with bigP hbigP,
+	cases powerset_axiom x with bigP hbigP,
 	cases specification_axiom bigP (λy, y ⊆ x) with P hP,
 	use P,
 	simp at *,
@@ -2731,8 +2731,8 @@ begin
 	exact ⟨hA ha, ha⟩,
 end
 
-lemma func_ext {f g : Set} [set_function f] [set_function g] (hfg : domain f = domain g) : 
-f = g ↔ ∀⦃x⦄, 
+lemma func_ext {f g : Set} (f_func :set_function f) (
+g_func :set_function g) (hfg : domain f = domain g) : f = g ↔ ∀⦃x⦄, 
 x ∈ domain f → f @@ x = g @@ x :=
 begin 
 	split,
@@ -2743,14 +2743,14 @@ begin
 		split,
 		{
 			intro hpf,
-			rcases _inst_1.is_func hpf with ⟨b, a, hp⟩,
+			rcases f_func.is_func hpf with ⟨b, a, hp⟩,
 			rw hp.1 at hpf,
 			have := h (mem_domain_pair hpf),
-			rw func_in _inst_1 (mem_domain_pair hpf) at this,
+			rw func_in f_func (mem_domain_pair hpf) at this,
 			rw← eval_unique f (mem_domain_pair hpf) hpf at this,
 			have hag := (mem_domain_pair hpf),
 			rw hfg at hag,
-			rw func_in _inst_2 hag at this,
+			rw func_in g_func hag at this,
 			rw hp.1,
 			rw this,
 			cases eval_spec g hag with trash goal,
@@ -2759,14 +2759,14 @@ begin
 		{
 			intro hpg,
 			rw hfg at h,
-			rcases _inst_2.is_func hpg with ⟨b, a, hp⟩,
+			rcases g_func.is_func hpg with ⟨b, a, hp⟩,
 			rw hp.1 at hpg,
 			have := h (mem_domain_pair hpg),
-			rw func_in _inst_2 (mem_domain_pair hpg) at this,
+			rw func_in g_func (mem_domain_pair hpg) at this,
 			rw← eval_unique g (mem_domain_pair hpg) hpg at this,
 			have hag := (mem_domain_pair hpg),
 			rw← hfg at hag,
-			rw func_in _inst_1 hag at this,
+			rw func_in f_func hag at this,
 			rw hp.1,
 			rw← this,
 			cases eval_spec f hag with trash goal,
@@ -2849,13 +2849,13 @@ begin
 	},
 end
 
-lemma restriction_agrees (f X : Set) [set_function f] {x : Set} (hxX : x ∈ X) :
+lemma restriction_agrees {f X : Set} (f_func : set_function f) {x : Set} (hxX : x ∈ X) :
 f @@ x = set_restriction f X @@ x := 
 begin 
-	have rest_func := is_func_restriction f X,
+	have rest_func := is_func_restriction f_func X,
 	by_cases x ∈ domain f,
 	{
-		rw func_in _inst_1 h,
+		rw func_in f_func h,
 		have hx_rest : x ∈ domain (set_restriction f X),
 		{
 			rw domain_of_restriction,
@@ -2914,9 +2914,10 @@ begin
 	exact func_in f_func hx,
 end
 
-lemma func_spec {f x : Set} [set_function f] (hx : x ∈ domain f) : ord_pair x (f @@ x) ∈ f :=
+lemma func_spec {f x : Set} (f_func : set_function f)
+ (hx : x ∈ domain f) : ord_pair x (f @@ x) ∈ f :=
 begin 
-	rw func_in _inst_1 hx,
+	rw func_in f_func hx,
 	cases eval_spec f hx,
 	exact h,
 end
@@ -2933,7 +2934,7 @@ begin
 	{
 		intro h,
 		rw h,
-		exact func_spec hx,
+		exact func_spec f_func hx,
 	},
 end
 
@@ -3117,15 +3118,16 @@ structure gen_equiv_relation {α : Type*} (r : gen_relation α α) :=
 def order_isomorphic : gen_relation ordered_set ordered_set  :=
 λ A B, ∃f (f_iso : order_isomorphism f A.set A.r B.set B.r), true
 
-theorem ord_isomorphism_is_trivial (α β : Set) [ordinal α] [ordinal β] 
-(f : Set) (f_iso : order_isomorphism f α (∈) β (∈)) : f = identity α :=
+theorem ord_isomorphism_is_trivial {α β : Set} (_inst_1 : ordinal α) 
+(_inst_2 : ordinal β) {f : Set} (f_iso : order_isomorphism f α (∈) β (∈)) :
+ f = identity α :=
 begin
 	have : domain f = domain (identity α),
 	{
 		rw identity_domain,
 		rwa f_iso.f_domain,
 	},
-	rw @func_ext f (identity α) f_iso.f_func (identity_func α) this,
+	rw func_ext f_iso.f_func (identity_func α) this,
 	rw f_iso.f_domain,
 	clear this,
 
@@ -3283,14 +3285,15 @@ order_isomorphism (identity X) X rX X rX :=
 	end
 }
 
-lemma ordinals_isomorphic_iff_eq (α β : Set) [ordinal α] [ordinal β] :
-(∃(f : Set) [f_iso : order_isomorphism f α (∈) β (∈)], true) ↔ α = β :=
+lemma ordinals_isomorphic_iff_eq {α β : Set} (_inst_1 : ordinal α) 
+(_inst_2 : ordinal β) :(∃(f : Set) 
+[f_iso : order_isomorphism f α (∈) β (∈)], true) ↔ α = β :=
 begin 
 	split,
 	{
 		intro h,
 		rcases h with ⟨f, f_iso, _⟩, clear h_h_h,
-		have f_id := ord_isomorphism_is_trivial α β f f_iso,
+		have f_id := ord_isomorphism_is_trivial _inst_1 _inst_2 f_iso,
 		ext γ,
 		split,
 		{
@@ -3559,7 +3562,7 @@ begin
 	},
 end
 
-lemma inverse_of_inverse (f : Set) [f_func : set_function f]: f = inv (inv f) :=
+lemma inverse_of_inverse {f : Set} (f_func : set_function f) : f = inv (inv f) :=
 begin 
 	ext p,
 	split,
@@ -3586,8 +3589,10 @@ begin
 	},
 end
 
-lemma inv_range (f : Set) [set_function f] : range (inv f) = domain f :=
-congr_arg domain (eq.symm (inverse_of_inverse f))
+lemma inv_range {f : Set} (f_func : set_function f) : range (inv f) = domain f :=
+congr_arg domain (eq.symm (inverse_of_inverse f_func))
+
+lemma inv_domain (f : Set) : domain (inv f) = range f := rfl
 
 lemma mem_inv_pair (f : Set) (a b : Set) : ord_pair a b ∈ inv f ↔ ord_pair b a ∈ f :=
 begin 
@@ -3610,9 +3615,51 @@ end
 lemma func_inv {f : Set} (f_func : set_function f) (f_inj : injective f) {y : Set}
 (hy : y ∈ domain (inv f)) : f @@ (inv f @@ y) = y :=
 begin 
-	have := @func_spec (inv f) y (inv_of_inj_is_func f f_inj) hy,
+	have := @func_spec (inv f) y (inv_of_inj_is_func f_func f_inj) hy,
 	rw mem_inv_pair at this,
 	exact eq.symm (func_unique f_func this),
+end
+
+lemma injective_iff {f : Set} (f_func : set_function f) : injective f ↔ ∀⦃x y⦄ 
+(hxf : x ∈ domain f) (hyf : y ∈ domain f), f @@ x = f @@ y →
+x = y :=
+begin 
+	rw injective_iff_bad,
+	split,
+	{
+		intros h x x' hx hx' hxx',
+		rw func_in f_func hx at hxx',
+		rw func_in f_func hx' at hxx',
+		exact h hxx',
+	},
+	{
+		intros h x x' hx hx' hxx',
+		rw← func_in f_func hx at hxx',
+		rw← func_in f_func hx' at hxx',
+		exact h hx hx' hxx',
+	},
+end
+
+lemma inv_inj {f : Set} (f_func : set_function f) (f_inj : injective f) :
+injective (inv f) :=
+begin
+	rw injective_iff (inv_of_inj_is_func f_func f_inj),
+	intros y y' hy hy' hyy',
+	rw [ ←func_inv f_func f_inj hy, ←func_inv f_func f_inj hy', hyy'],
+end
+
+lemma inv_func {f : Set} (f_func : set_function f) (f_inj : injective f) {x : Set}
+(hx : x ∈ domain f) : (inv f) @@ (f @@ x) = x :=
+begin 
+	have := inverse_of_inverse f_func,
+	have obv : inv f @@ (f @@ x) = inv f @@ (inv (inv f) @@ x) := 
+	congr rfl (congr_fun (congr_arg eval_full_set this) x),
+	rw obv, clear obv,
+	rw this at hx,
+	have := func_inv (inv_of_inj_is_func f_func f_inj) _ hx,
+	exact this,
+
+	exact inv_inj f_func f_inj,
 end
 
 lemma inverse_order_isomorphism {f A B : Set} {rA rB : relation} 
@@ -3696,7 +3743,7 @@ lemma inverse_order_isomorphism {f A B : Set} {rA rB : relation}
 	end
 }
 
-lemma domain_comp {g f : Set} (f_func : set_function f) (g_func : set_function g) : 
+lemma domain_comp {g f : Set} (g_func : set_function g) (f_func : set_function f) : 
 domain (g ∘ f) = { x ∈ domain f | f @@ x ∈ domain g} := 
 begin 
 	rw domain_of_comp_bad,
@@ -3726,7 +3773,7 @@ begin
 		assumption,
 	},
 
-	have h := @func_spec (g ∘ f) x (comp_is_func g f) hx,
+	have h := @func_spec (g ∘ f) x (comp_is_func g_func f_func) hx,
 
 	rw mem_comp_pair at h,
 	rcases h with ⟨y, hxyf, hy⟩,
@@ -3738,7 +3785,7 @@ lemma domain_comp' {g f : Set} (g_func : set_function g)
 (f_func : set_function f) (hfg : range f = domain g) : 
 domain (g ∘ f) = domain f :=
 begin 
-	rw domain_comp f_func g_func,
+	rw domain_comp g_func f_func,
 	ext x,
 	rw mem_sep,
 	split,
@@ -3779,7 +3826,7 @@ lemma range_comp' {g f : Set} (g_func : set_function g)
  range (g ∘ f) = range g :=
 begin 
 	ext z,
-	rw mem_range_iff (comp_is_func g f),
+	rw mem_range_iff (comp_is_func g_func f_func),
 	split,
 	{
 		intro h,
@@ -3806,31 +3853,11 @@ begin
 	},
 end
 
-lemma injective_iff {f : Set} (f_func : set_function f) : injective f ↔ ∀⦃x y⦄ 
-(hxf : x ∈ domain f) (hyf : y ∈ domain f), f @@ x = f @@ y →
-x = y :=
-begin 
-	rw injective_iff_bad,
-	split,
-	{
-		intros h x x' hx hx' hxx',
-		rw func_in f_func hx at hxx',
-		rw func_in f_func hx' at hxx',
-		exact h hxx',
-	},
-	{
-		intros h x x' hx hx' hxx',
-		rw← func_in f_func hx at hxx',
-		rw← func_in f_func hx' at hxx',
-		exact h hx hx' hxx',
-	},
-end
-
 lemma comp_inj {g f : Set} (g_func : set_function g)
 (f_func : set_function f) (g_inj : injective g) (f_inj : injective f) 
 (hfg : range f = domain g) : injective (g ∘ f) :=
 begin 
-	rw injective_iff (comp_is_func g f),
+	rw injective_iff (comp_is_func g_func f_func),
 	rw injective_iff g_func at g_inj,
 	rw injective_iff f_func at f_inj,
 
@@ -3851,8 +3878,8 @@ begin
 	},
 end
 
-lemma order_ismorphism_comp {f g A B C : Set} {rA rB rC : relation} 
-(f_iso : order_isomorphism f A rA B rB) (g_iso : order_isomorphism g B rB C rC) 
+lemma order_isomorphism_comp {f g A B C : Set} {rA rB rC : relation} 
+(f_iso : order_isomorphism f A rA B rB) (g_iso : order_isomorphism g B rB C rC)
 : order_isomorphism (g ∘ f) A rA C rC := {
 	f_func := @comp_is_func g f g_iso.f_func f_iso.f_func,
 	f_domain := 
@@ -3912,7 +3939,7 @@ begin
 		rcases hXY with ⟨f, f_iso, -⟩,
 		rcases hYZ with ⟨g, g_iso, -⟩,
 		use g ∘ f,
-		use order_ismorphism_comp f_iso g_iso,
+		use order_isomorphism_comp f_iso g_iso,
 	},
 end
 
@@ -3942,6 +3969,372 @@ begin
 	exact ha hxA hyfa,
 end
 
+postfix ⁻¹ := inv
+
+lemma func_comp_inv_is_identity {f : Set} (f_func : set_function f) 
+(f_inj : injective f) : f ∘ f⁻¹ = identity (range f) :=
+begin 
+	have f_inv_func := inv_of_inj_is_func f_func f_inj,
+	have comp_dom := domain_comp f_func f_inv_func,
+	rw inv_domain at comp_dom,
+	have h_dom : domain (f ∘ f⁻¹) = domain (identity (range f)),
+	{
+		rw identity_domain,
+		rw comp_dom,
+		ext x,
+		rw mem_sep,
+		split,
+		{
+			intro h, exact h.1,
+		},
+		{
+			intro h,
+			use h,
+			rw← inv_domain at h,
+			rw← inv_range f_func,
+			exact func_mem_range f_inv_func h,
+		},
+	},
+
+	have comp_func := @comp_is_func f f⁻¹ f_func f_inv_func,
+	rw func_ext comp_func (identity_func (range f)) h_dom,
+	intros x hx_comp,
+	have hx_id : x ∈ range f,
+	{
+		rw h_dom at hx_comp,
+		rwa identity_domain (range f) at hx_comp,
+	},
+	rw eval_identity hx_id,
+	rw eval_comp f_func f_inv_func hx_comp,
+	exact func_inv f_func f_inj hx_id,
+end
+
+lemma inv_comp_func_is_identity {f : Set} (f_func : set_function f) 
+(f_inj : injective f) : f⁻¹ ∘ f = identity (domain f) :=
+begin 
+	have obv : f⁻¹ ∘ f = f⁻¹ ∘ f⁻¹⁻¹ := congr_arg (comp f⁻¹) 
+	(inverse_of_inverse f_func),
+	rw obv,
+	rw func_comp_inv_is_identity (inv_of_inj_is_func f_func f_inj)
+	(inv_inj f_func f_inj),
+	rw inv_range f_func,
+end
+
+lemma comp_identity {f : Set} (f_func : set_function f) : 
+f ∘ (identity (domain f)) = f :=
+begin
+	 have id_func := identity_func (domain f),
+	 have h_dom : domain (f∘identity (domain f)) = domain f,
+	 	{
+		 rw domain_comp f_func id_func,
+		 ext x,
+		 rw mem_sep,
+		 rw identity_domain,
+		 split,
+		 {
+			 intro h, exact h.1,
+		 },
+		 {
+			 intro h, use h,
+			 rwa eval_identity h,
+		 },
+	 },
+	 
+	 rw func_ext,
+	 {
+		 intros x hx1,
+		 rw eval_comp f_func id_func hx1,
+		 rw h_dom at hx1,
+		 rw eval_identity hx1,
+	 },
+	 {exact comp_is_func f_func id_func},
+	 {exact f_func},
+	 {exact h_dom},
+end
+
+lemma identity_comp {f : Set} (f_func : set_function f) : 
+(identity (range f)) ∘ f = f :=
+begin 
+	 have id_func := identity_func (range f),
+	 have h_dom : domain (identity (range f) ∘ f) = domain f,
+	 {
+			rw domain_comp id_func f_func,
+			rw identity_domain,
+			ext x,
+			rw mem_sep,
+			split,
+			{
+				intro h, exact h.1,
+			},
+			{
+				intro h, use h,
+				exact func_mem_range f_func h,
+			},
+	 },
+
+	rw func_ext (comp_is_func id_func f_func) f_func h_dom,
+	intros x hx,
+	rw eval_comp id_func f_func hx,
+	rw h_dom at hx,
+	rw eval_identity (func_mem_range f_func hx),
+end
+
+lemma comp_assoc {f g h : Set} (f_func : set_function f) (g_func : set_function g)
+(h_func : set_function h) (h_hg : range h ⊆ domain g) (h_gf : range g ⊆ domain f) 
+: f ∘ (g ∘ h) = (f ∘ g) ∘ h :=
+begin
+	have gh_func := comp_is_func g_func h_func,
+	have fg_func := comp_is_func f_func g_func,
+	have f_gh_func := comp_is_func f_func gh_func,
+	have fg_h_func := comp_is_func fg_func h_func,
+	have h_dom : domain (f∘(g∘h)) = domain (f∘g∘h),
+		{
+		rw domain_comp f_func gh_func,
+		rw domain_comp fg_func h_func,
+		ext x,
+		rw [mem_sep],
+		split,
+		{
+			intros hx,
+			have hx_gh := hx.1,
+			rw [mem_sep, domain_comp f_func g_func, mem_sep],
+			rw [domain_comp g_func h_func, mem_sep] at hx,
+			use hx.1.1,
+			use h_hg (func_mem_range h_func hx.1.1),
+			rw eval_comp  g_func h_func hx_gh at hx,
+			exact hx.2,
+		},
+		{
+			intro hx,
+			rw mem_sep at hx,
+			rw [domain_comp g_func h_func, mem_sep],
+			split,
+			{
+				use hx.1,
+				exact h_hg (func_mem_range h_func hx.1),
+			},
+			{
+				apply h_gf,
+				have : x ∈ domain (g ∘ h),
+				{
+					rw [domain_comp g_func h_func, mem_sep],
+					use hx.1,
+					exact h_hg (func_mem_range h_func hx.1),
+				},
+				rw eval_comp g_func h_func this,
+				exact func_mem_range g_func (h_hg (func_mem_range h_func hx.1)),
+			},
+		},
+	},
+
+	rw func_ext f_gh_func fg_h_func h_dom, swap,
+	
+	intros x hx,
+	rw eval_comp f_func gh_func hx,
+	rw h_dom at hx,
+	rw eval_comp fg_func h_func hx,
+	have hxh : x ∈ domain h,
+	{
+		rw domain_comp fg_func h_func at hx,
+		rw mem_sep at hx, exact hx.1,
+	},
+	have hx_gh : x ∈ domain (g ∘ h),
+	{
+		rw [domain_comp g_func h_func, mem_sep], use hxh,
+		exact h_hg (func_mem_range h_func hxh),
+	},
+	have : h @@ x ∈ domain (f ∘ g),
+	{
+		rw [domain_comp f_func g_func, mem_sep],
+		have := h_hg (func_mem_range h_func hxh),
+		use this,
+		exact h_gf (func_mem_range g_func this),
+	},
+
+	rw eval_comp g_func h_func hx_gh,
+	rw eval_comp f_func g_func this,
+end
+
+lemma comp_assoc' {f g h : Set} (f_func : set_function f) (g_func : set_function g)
+(h_func : set_function h) (h_hg : range h = domain g) (h_gf : range g = domain f) 
+: f ∘ (g ∘ h) = (f ∘ g) ∘ h :=
+begin 
+	rw eq_iff_subsets (range h) (domain g) at h_hg,
+	rw eq_iff_subsets (range g) (domain f) at h_gf,
+	exact comp_assoc f_func g_func h_func h_hg.1 h_gf.1,
+end
+
+lemma order_isomorphism_unique {A : Set} {R : relation} {α : Set} 
+(α_ord : ordinal α) {f g : Set}
+(f_iso : order_isomorphism f A R α (∈))
+(g_iso : order_isomorphism g A R α (∈)) : f = g :=
+begin 
+	have invg_iso := inverse_order_isomorphism g_iso,
+	have fg_iso := order_isomorphism_comp invg_iso f_iso,
+
+	have hfg := ord_isomorphism_is_trivial α_ord α_ord fg_iso,
+	have : (f ∘ g⁻¹) ∘ g = (identity α) ∘ g := congr_fun (congr_arg comp hfg) g,
+  have temp : range g⁻¹ = domain f,
+	{
+		rw inv_range g_iso.f_func,
+		rw g_iso.f_domain,
+		rw f_iso.f_domain,
+	},
+	have temp2 := comp_assoc' f_iso.f_func invg_iso.f_func g_iso.f_func rfl temp,
+	rw inv_comp_func_is_identity g_iso.f_func g_iso.f_injective at temp2,
+	rw← temp2 at this,
+	have temp3 := comp_identity f_iso.f_func,
+	rw f_iso.f_domain at temp3,
+	rw← g_iso.f_domain at temp3,
+	rw temp3 at this,
+	have temp4 := identity_comp g_iso.f_func,
+	rw g_iso.f_range at temp4,
+	rwa temp4 at this,
+end
+
+lemma order_isomorphism_unique' {A : ordered_set} (α : Set) [ordinal α] {f g : Set}
+(f_iso : order_isomorphism f A.set A.r α (∈))
+(g_iso : order_isomorphism g A.set A.r α (∈)) : f = g :=
+order_isomorphism_unique _inst_1 f_iso g_iso
+
+
+lemma set_func_of_class_func {φ : relation} {X : Set}
+ (φ_func : class_function_on_set φ X) : ∃f, ∃(f_func : set_function f),
+  domain f = X ∧ ∀⦃x : Set⦄ (y : Set), x ∈ X → (f @@ x = y ↔ φ x y) :=
+begin
+	 let ψ := λx y, ∃z, φ x z ∧ y = ord_pair x z,
+	 have ψ_func : class_function_on_set ψ X,
+	 {
+		 fconstructor,
+		 intros x hx,
+		 cases φ_func.is_func hx with y hy,
+		 use ord_pair x y,
+		 use [y, hy.1],
+		 intros z hxz,
+		 cases hxz with z1 hz1,
+		 rw hz1.2,
+		 rw ord_pair_eq_iff,
+		 use rfl,
+		 exact hy.2 hz1.1,
+	 },
+	 cases restricted_replacement ψ_func with f hf,
+	 use f,
+	 
+	suffices f_func : is_set_function f,
+	{
+		use set_function.mk f_func,
+		have f_dom : domain f = X,
+		{
+		ext x,
+			split,
+			{
+				intro h,
+				rw mem_domain at h,
+				cases h with y hy,
+				rw hf (ord_pair x y) at hy,
+				rcases hy with ⟨x2, hx2, hx2xy⟩,
+				rcases hx2xy with ⟨z, hx2z, hx2hy⟩,
+				rw ord_pair_eq_iff at hx2hy,
+				rwa← hx2hy.1 at hx2,
+			},
+			{
+				intros hx,
+				rw mem_domain,
+				cases φ_func.is_func hx with y hy,
+				use y,
+				rw hf,
+				use [x, hx, y, hy.1],
+			},
+		},
+		use f_dom,
+
+		intros x y hx,
+		split,
+		{
+			intro h,
+			rw← f_dom at hx,
+			have := func_spec {is_func := f_func} hx,
+			rw hf at this,
+			rcases this with ⟨x1, hx1, z, hx1z, hxx1⟩,
+			rw ord_pair_eq_iff at hxx1,
+			rw← hxx1.2 at hx1z,
+			rw← hxx1.1 at hx1z,
+			rwa h at hx1z,
+		},
+		{
+			intro h,
+			suffices : φ x (f @@ x),
+			{
+				cases φ_func.is_func hx with y1 hy1,
+				rw← hy1.2 this,
+				rw← hy1.2 h,
+			},
+			{
+				rw← f_dom at hx,
+				have := func_spec {is_func := f_func} hx,
+				rw hf at this,
+				rcases this with ⟨x1, hx1X, z, hx1z, hpair⟩,
+				rw ord_pair_eq_iff at hpair,
+				rwa [hpair.2, hpair.1],
+			},
+		},
+	},
+
+	intros p hp,
+	rw hf at hp,
+	rcases hp with ⟨x, hxX, z, hz⟩,
+	use [z, x, hz.2],
+	intros c hc,
+	rw hf at hc,
+	rcases hc with ⟨x1, hx1, z1, hz1φ, hpair⟩,
+	rw ord_pair_eq_iff at hpair,
+	rw← hpair.1 at hz1φ,
+	rw← hpair.2 at hz1φ,
+	cases φ_func.is_func hxX with y1 hy1,
+	rw← hy1.2 hz1φ,
+	rw← hy1.2 hz.1,
+end
+
+lemma order_iso_of_iso {f : Set} {A B : ordered_set} 
+(f_iso : order_isomorphism f A.set A.r B.set B.r) : order_isomorphic A B :=
+by use [f, f_iso]
+
+lemma domain_restriction_subset {f : Set} (f_func : set_function f) (A : Set) :
+domain (set_restriction f A) ⊆ domain f :=
+begin 
+	rw domain_of_restriction f A,
+	exact pair_inter_subset_left (domain f) A,
+end
+
+lemma range_restriction_subset {f : Set} (f_func : set_function f) (A : Set) :
+range (set_restriction f A) ⊆ range f :=
+begin 
+	intros y hy,
+	rcases mem_range_is_func (is_func_restriction f_func A) hy with ⟨x, hx⟩,
+	rw domain_of_restriction f A at hx,
+	rw mem_pair_inter at hx,
+	have := restriction_agrees f_func hx.1.2,
+	rw← this at hx,
+	rw mem_range_iff f_func,
+	use [x, hx.1.1, eq.symm hx.2],
+end
+
+lemma restriction_injective {f : Set} (f_func : set_function f) (A : Set)
+(f_inj : injective f) : injective (set_restriction f A) :=
+begin 
+	have rest_func := is_func_restriction f_func A,
+
+	rw injective_iff rest_func,
+	rw injective_iff f_func at f_inj,
+
+	intros x y hx hy h,
+
+	rw [domain_of_restriction, mem_pair_inter] at hx hy,
+	rw [←restriction_agrees f_func hx.2, ←restriction_agrees f_func hy.2] at h,
+
+	exact f_inj hx.1 hy.1 h,
+end
+
 theorem wo_isomorphic_ordinal {A : Set} {R : relation} (A_wo : well_order A R) :
 ∃! (α : Set), α ∈ ON ∧ order_isomorphic (ordered_set.mk α (∈)) (ordered_set.mk A R) :=
 begin
@@ -3951,10 +4344,425 @@ begin
 		unfold exists_unique,
 		rcases h_exists with ⟨α, α_ord, hα⟩,
 		use [α, α_ord, hα],
-		intros y hy,
-		sorry,
+
+		intros β hβ,
+		rcases order_isomorphism_equiv.tran hα (order_isomorphism_equiv.symm hβ.2)
+		with ⟨f, f_iso, -⟩,
+		apply eq.symm,
+		rw← ordinals_isomorphic_iff_eq α_ord (ord_of_mem_ON hβ.1),
+		use [f, f_iso],
 	},
-	sorry,
+	let G := {a ∈ A | ∃(α : Set) [ordinal α]
+	(f : Set) (f_iso : order_isomorphism f {c ∈ A | R c a} R α (∈)), true},
+	let φ1 := λx y, 
+	∃(f : Set) (f_iso : order_isomorphism f {c ∈ A | R c x} R y (∈)), y ∈ ON,
+	have φ1_func : class_function_on_set φ1 G,
+	{
+		fconstructor,
+		intros x hxG,
+		rw mem_sep at hxG,
+		rcases hxG with ⟨hxA, α, α_ord, f, f_iso, -⟩,
+		use [α, f, f_iso, α_ord],
+		intros z hz,
+		rcases hz with ⟨f2, hf2, z_ord⟩,
+		have hf2_inv := inverse_order_isomorphism hf2,
+		have := order_isomorphism_comp hf2_inv f_iso,
+		apply eq.symm,
+		rw← ordinals_isomorphic_iff_eq (ord_of_mem_ON z_ord) α_ord,
+		use [(f ∘ f2⁻¹), this],
+	},
+
+	rcases set_func_of_class_func φ1_func with ⟨f, f_func, f_dom, f_φ1⟩,
+
+	let φ2 := λx y, 
+	∃(y_iso : order_isomorphism y {c ∈ A | R c x} R (f @@ x) (∈)), true,
+	have φ2_func : class_function_on_set φ2 G,
+	{
+		fconstructor,
+		intros x hxG_temp,
+		have hxG := hxG_temp,
+		rw mem_sep at hxG_temp,
+		rcases hxG_temp with ⟨hxa, α, α_ord, hₓ, hₓ_iso, -⟩,
+		use hₓ,
+		have hfα : f @@ x = α,
+			{
+				rw f_φ1 α hxG,
+				use [hₓ, hₓ_iso],
+				exact mem_ON_of_ord α_ord,
+			},
+		split,
+		{
+			rw← hfα at hₓ_iso,
+			use hₓ_iso,
+		},
+		{
+			intros z hz,
+			rcases hz with ⟨z_iso, -⟩,
+			rw hfα at z_iso,
+			exact order_isomorphism_unique α_ord hₓ_iso z_iso,
+		},
+	},
+
+	rcases set_func_of_class_func φ2_func with ⟨g, g_func, g_dom, g_φ2⟩,
+
+	have hG : ∀⦃a c⦄, a ∈ G → c ∈ A → R c a → 
+	(g @@ c = set_restriction (g @@ a) {x ∈ A | R x c} ∧ c ∈ G ∧ f @@ c = (g @@ a) @@ c),
+	{
+		intros a c haG hcA hca,
+		let h_c := (set_restriction (g @@ a) {x ∈ A | R x c}),
+		have hc_a_down : c ∈ {c ∈ A | R c a},
+		{
+			rw mem_sep,
+			exact ⟨hcA, hca⟩,
+		},
+		have := (g_φ2 (g @@ a) haG).mp rfl,
+		rcases this with ⟨g_iso, -⟩,
+		have h_c_func : set_function h_c := is_func_restriction g_iso.f_func {x ∈ A | R x c},
+		have hca_ss : {x ∈ A | R x c} ⊆ domain (g @@ a),
+		{
+			rw g_iso.f_domain,
+			intros x hx,
+			rw mem_sep at *,
+			use hx.1,
+			exact A_wo.tran hx.1 hcA haG.1 hx.2 hca,
+
+		},
+
+		have hc_g_dom : c ∈ domain (g @@ a),
+		{
+			rw g_iso.f_domain,
+			rw mem_sep,
+			exact ⟨hcA, hca⟩,
+		},
+
+		have fa_ord : f @@ a ∈ ON,
+		{
+			rcases (f_φ1 (f @@ a) haG).mp rfl with ⟨_, _, goal⟩,
+			exact goal,
+		},
+
+		have : g @@ a @@ c ∈ f @@ a,
+		{
+			have := func_mem_range g_iso.f_func hc_g_dom,
+			rwa g_iso.f_range at this,
+		},
+		have gac_ord := ord_of_mem_ON (mem_of_ordinal_is_ordinal fa_ord this),
+		
+		have h_c_dom :=
+		@domain_of_restriction_ss (g @@ a) {x ∈ A | R x c} hca_ss g_iso.f_func,
+
+		have h_c_iso : order_isomorphism h_c {x ∈ A | R x c} R ((g @@ a) @@ c) (∈) := 
+		{
+			f_func := h_c_func,
+			f_domain := h_c_dom,
+			f_range := begin 
+				ext y,
+				split,
+				{
+					intro h,
+					rw mem_range_iff h_c_func at h,
+					rcases h with ⟨x, hx, hxy⟩,
+					rw @domain_of_restriction_ss
+					(g @@ a) {x ∈ A | R x c} hca_ss g_iso.f_func at hx,
+					have hx_c_down := hx,
+					rw mem_sep at hx haG,
+					have hx_a_down : x ∈ {c ∈ A | R c a},
+					{
+						rw mem_sep,
+						use [hx.1, A_wo.tran hx.1 hcA haG.1 hx.2 hca],
+					},
+					rw← restriction_agrees g_iso.f_func hx_c_down at hxy,
+					rw hxy,
+					rw← g_iso.f_isomorphism hx_a_down hc_a_down,
+					exact hx.2,
+				},
+				{
+					intro h,
+					rw mem_range_iff h_c_func,
+					have : g @@ a @@ c ∈ f @@ a,
+					{
+						have := func_mem_range g_iso.f_func hc_g_dom,
+						rwa g_iso.f_range at this,
+					},
+					have hy_fa := (ord_of_mem_ON fa_ord).tran this h,
+					rw← g_iso.f_range at hy_fa,
+					rw mem_range_iff g_iso.f_func at hy_fa,
+					rcases hy_fa with ⟨x, hx_dom, hyx⟩,
+					use x,
+					rw h_c_dom,
+					rw hyx at h,
+					rw g_iso.f_domain at hx_dom,
+					rw← g_iso.f_isomorphism hx_dom hc_a_down at h,
+					have hx_c_down : x ∈ {x ∈ A | R x c},
+					{
+						rw mem_sep at hx_dom ⊢,
+						use ⟨hx_dom.1, h⟩,
+					},
+					use hx_c_down,
+					rw hyx,
+					exact restriction_agrees g_iso.f_func hx_c_down,
+				},
+			end,
+			f_injective := 
+			restriction_injective g_iso.f_func {x ∈ A | R x c} g_iso.f_injective,
+			f_isomorphism := begin 
+				intros a1 a2 a1_dom a2_dom,
+				have a1_c_down := a1_dom,
+				have a2_c_down := a2_dom,
+				rw mem_sep at a1_dom a2_dom haG,
+				have ha1 : a1 ∈ {c ∈ A | R c a},
+				{
+					rw mem_sep,
+					use a1_dom.1,
+					exact A_wo.tran a1_dom.1 hcA haG.1 a1_dom.2 hca,
+				},
+				have ha2 : a2 ∈ {c ∈ A | R c a},
+				{
+					rw mem_sep,
+					use a2_dom.1,
+					exact A_wo.tran a2_dom.1 hcA haG.1 a2_dom.2 hca,
+				},
+				rw [←restriction_agrees g_iso.f_func a1_c_down, 
+				←restriction_agrees g_iso.f_func a2_c_down],
+				exact g_iso.f_isomorphism ha1 ha2,
+			end,
+		},
+
+		have φ1_c : φ1 c (g @@ a @@ c),
+		{
+			use h_c,
+			use h_c_iso,
+			exact mem_ON_of_ord gac_ord,
+		},
+		have hcG : c ∈ G,
+		{
+			rw mem_sep,
+			use [hcA, g @@ a @@ c, gac_ord, h_c, h_c_iso],
+		},
+		have hfc_gac := (f_φ1 (g @@ a @@ c) hcG).mpr φ1_c,
+		have φ2_h_c : φ2 c h_c,
+		{
+			change 
+			∃ (y_iso : order_isomorphism h_c {x ∈ A | R x c} R (f @@ c) has_mem.mem), true,
+			rw hfc_gac,
+			use h_c_iso,
+		},
+		have hgc_h_c := (g_φ2 h_c hcG).mpr φ2_h_c,
+		exact ⟨hgc_h_c, hcG, hfc_gac⟩,
+	},
+
+	have ran_f_ord_set : subset_class (range f) ON,
+	{
+		intros α hα,
+		rw mem_range_iff f_func at hα,
+		rcases hα with ⟨a, haf, haα⟩,
+		rw f_dom at haf,
+		rcases (f_φ1 (f @@ a) haf).mp rfl with ⟨_, _, goal⟩,
+		rw haα,
+		exact goal,
+	},
+
+	have ran_f_tran : transitive (range f),
+	{
+		unfold transitive,
+		intros α hα β hβ,
+		rw mem_range_iff f_func at hα,
+		rcases hα with ⟨a, haG, ha⟩,
+		rw f_dom at haG,
+		rw ha at hβ, clear ha,
+		rw mem_range_iff f_func,
+		rcases (g_φ2 (g @@ a) haG).mp rfl with ⟨ga_iso, -⟩,
+		rw← ga_iso.f_range at hβ,
+		rw mem_range_iff ga_iso.f_func at hβ,
+		rcases hβ with ⟨b, hb_a_down, hbβ⟩,
+		have hb_f_dom := hb_a_down,
+		rw ga_iso.f_domain at hb_a_down,
+		rw mem_sep at hb_a_down,
+		have := hG haG hb_a_down.1 hb_a_down.2,
+		rw← this.2.2 at hbβ,
+		rw f_dom,
+		use [b, this.2.1, hbβ],
+	},
+
+	have ran_f_ord := tran_set_of_ord_is_ord ran_f_tran ran_f_ord_set,
+	have f_order_preserving_mp : ∀⦃a b⦄, a ∈ G → b ∈ G → R b a → (f @@ b) ∈ (f @@ a),
+	{
+		intros a b haG hbG hba,
+		have hbA := hbG, rw mem_sep at hbA,
+		rw (hG haG hbA.1 hba).2.2,
+		rcases (g_φ2 (g @@ a) haG).mp rfl with ⟨ga_iso, -⟩,
+		rw [←ga_iso.f_range, mem_range_iff ga_iso.f_func, ga_iso.f_domain],
+		use b,
+		rw mem_sep,
+		use ⟨⟨hbA.1, hba⟩, rfl⟩,
+	},
+	have f_order_preserving : ∀⦃a b⦄, b ∈ G → a ∈ G → (R b a ↔ (f @@ b) ∈ (f @@ a)),
+	{
+		intros a b hbG haG,
+		split,
+		{
+			intro hba,
+			exact f_order_preserving_mp haG hbG hba,
+		},
+		{
+			intro h,
+			by_contra hba,
+			have haA : a ∈ A,
+			{
+				rw mem_sep at haG, exact haG.1,
+			},
+			have hbA : b ∈ A,
+			{
+				rw mem_sep at hbG, exact hbG.1,
+			},
+			have fa_ord : ordinal (f @@ a),
+			{
+				apply ord_of_mem_ON,
+				apply ran_f_ord_set,
+				rw mem_range_iff f_func,
+				use a,
+				rw f_dom,
+				use haG,
+			},
+			cases A_wo.tri hbA haA, exact hba h_1,
+			cases h_1,
+			{
+				have := f_order_preserving_mp hbG haG h_1,
+				exact not_ord_mem_ord fa_ord this h,
+			},
+			{
+				rw h_1 at h,
+				exact ord_not_mem_self (mem_ON_of_ord fa_ord) h,
+			},
+		},
+	},
+	have f_iso : order_isomorphism f G R (range f) (∈) := {
+		f_func := f_func,
+		f_domain := f_dom,
+		f_range := rfl,
+		f_injective := begin 
+			rw [injective_iff f_func, f_dom],
+			intros x y hxG hyG hxy,
+			by_contra,
+			have hxA : x ∈ A,
+			{
+				rw mem_sep at hxG,
+				exact hxG.1,
+			},
+			have hyA : y ∈ A,
+			{
+				rw mem_sep at hyG,
+				exact hyG.1,
+			},
+			have fx_ord : ordinal (f @@ x),
+			{
+				apply ord_of_mem_ON,
+				apply ran_f_ord_set,
+				rw mem_range_iff f_func,
+				use x,
+				rw f_dom,
+				use hxG,
+			},
+			cases A_wo.tri hxA hyA,
+			{
+				have := f_order_preserving_mp hyG hxG h_1,
+				rw← hxy at this,
+				exact ord_not_mem_self (mem_ON_of_ord fx_ord) this,
+			},
+			cases h_1,
+			{
+				have := f_order_preserving_mp hxG hyG h_1,
+				rw← hxy at this,
+				exact ord_not_mem_self (mem_ON_of_ord fx_ord) this,
+			},
+			{
+				exact h h_1,
+			},
+		end,
+		f_isomorphism := λb a, @f_order_preserving a b,
+	},
+
+	by_cases hGA : A \ G ≠ ∅,
+	{
+		rcases A_wo.wf (diff_subset A G) hGA with ⟨e, e_AG, e_min⟩,
+		have heG : {a ∈ A | R a e} = G,
+		{
+			ext a,
+			rw mem_sep,
+			split,
+			{
+				intro h,
+				by_contra haG,
+				have : a ∈ A \ G,
+				{
+					rw mem_diff,
+					exact ⟨h.1, haG⟩,
+				},
+				exact e_min this h.2,
+			},
+			{
+				intro haG_temp,
+				have haG := haG_temp,
+				rw mem_sep at haG_temp,
+				use haG_temp.1,
+				rw mem_diff at e_AG,
+				cases A_wo.tri haG_temp.1 e_AG.1, exact h,
+				cases h,
+				{
+					exfalso,
+					exact e_AG.2 (hG haG e_AG.1 h).2.1,
+				},
+				{
+					rw h at haG, exfalso,
+					exact e_AG.2 haG,
+				},
+			},
+		},
+		suffices : e ∈ G,
+		{
+			rw mem_diff at e_AG, exfalso,
+			exact e_AG.2 this,
+		},
+		{
+			rw mem_sep,
+			rw mem_diff at e_AG,
+			use e_AG.1,
+			use [range f, ran_f_ord, f],
+			rw heG,
+			use f_iso,
+		},
+	},
+	{
+		have : A = G,
+		{
+			rw eq_iff_subsets,
+			split,
+			{
+				intros a ha,
+				by_contra,
+				have : a ∈ A \ G,
+				{
+					rw mem_diff,
+					exact ⟨ha, h⟩,
+				},
+				push_neg at hGA,
+				rw hGA at this,
+				simp at this,
+				exact this,
+			},
+			{
+				intros a haG,
+				rw mem_sep at haG,
+				exact haG.1,
+			},
+		},
+		use [range f, ran_f_ord],
+		unfold order_isomorphic,
+		have inv_iso := inverse_order_isomorphism f_iso,
+		use f⁻¹,
+		rw← this at inv_iso,
+		use inv_iso,
+	},
 end
 
 theorem primitive_recursion (φ : relation) [class_function φ] :
@@ -3989,7 +4797,7 @@ begin
 			finish,
 		},
 		
-		have h'_rest_func := (@is_func_restriction h' δ h'_func),
+		have h'_rest_func := (is_func_restriction h'_func δ),
 		rw @func_ext h (set_restriction h' δ) h_func h'_rest_func hh'_dom,
 		rw h_dom,
 		let X := {ξ ∈ δ | h @@ ξ ≠ h' @@ ξ},
@@ -4049,7 +4857,7 @@ begin
 				have obv : domain (set_restriction h ξ) = domain (set_restriction h' ξ) := 
 				(rfl.congr (eq.symm h'_rest_dom)).mp h_rest_dom,
 				rw @func_ext (set_restriction h ξ) (set_restriction h' ξ) 
-				(@is_func_restriction h ξ h_func) (@is_func_restriction h' ξ h'_func) obv,
+				(is_func_restriction h_func ξ) (is_func_restriction h'_func ξ) obv,
 				rw h_rest_dom,
 				by_contra hcontra,
 				push_neg at hcontra,
@@ -4109,5 +4917,7 @@ begin
 	use [ψ, ψ_func],
 	sorry,
 end
+
+
 
 end test
