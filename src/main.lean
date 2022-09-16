@@ -1446,7 +1446,7 @@ axiom replacement_axiom (φ : relation) [class_function φ] (A : Set) :
 ∃B : Set, ∀⦃y⦄, (∃⦃z⦄ (hz : z ∈ A), φ z y) → y ∈ B
 
 lemma replacement' (φ : relation) [φ_func : class_function φ] (A : Set) : 
-∃B : Set, ∀⦃y⦄, (∃⦃z⦄ (hz : z ∈ A), φ z y) ↔ y ∈ B :=
+∃B : Set, ∀y, (∃z (hz : z ∈ A), φ z y) ↔ y ∈ B :=
 begin
 	cases replacement_axiom φ A with B hB,
 
@@ -2402,71 +2402,11 @@ prefix `𝒫 ` := powerset
 @[simp] def mem_powerset (x : Set) : 
 ∀y, y ∈ 𝒫 x ↔ y ⊆ x := classical.some_spec (powerset_exits x)
 
-infix ` ≼` :50 := λ A B, ∃(f : Set) [set_function f], injective f
-
 structure bijection (f A B : Set) :=
 [f_func : set_function f]
 (f_domain : domain f = A)
 (f_range : range f = B)
 (f_injective : injective f)
-
-infix ` ≈ `:50 := λA B, ∃(f : Set) (f_bi : bijection f A B), true
-
-infix ` ≺ `:50 := λ A B, (∃(f : Set) (f_func : set_function f), injective f) ∧
-¬∃(f : Set) (f_bi : bijection f A B), true 
-
-theorem cantors_theorem {A f : Set} (f_func : set_function f) (hfA : domain f = A) : 
-¬ 𝒫 A ⊆ range f :=
-begin 
-	intro h,
-	let B := {x ∈ A | ∃(hx : x ∈ domain f), x ∉ eval f hx},
-	have hB : B ∈ 𝒫 A,
-	{
-		rw mem_powerset,
-		intros y hy,
-		rw mem_sep at hy,
-		exact hy.1,
-	},
-	have B_ss := h hB,
-	rw mem_range at B_ss,
-	rcases B_ss with ⟨x, hxBf⟩,
-	have hxf : x ∈ domain f,
-	{
-		rw mem_domain,
-		use [B, hxBf],
-	},
-	have f_at_x := eval_unique f hxf hxBf,
-	have : x ∈ B ↔ x ∉ B,
-	{
-		clear h,
-		split,
-		{
-			intros h,
-			rw mem_sep at h,
-			intro contra,
-			rcases h with ⟨hxA, hx2, hxf2⟩,
-			apply hxf2,
-			have := eval_behaves f hxf hx2,
-			rw [←this, ←f_at_x],
-			exact contra,
-		},
-		{
-			intro h,
-			rw mem_sep,
-			split,
-			{
-				rw hfA at hxf,
-				exact hxf,
-			},
-			{
-				use hxf,
-				rw← f_at_x,
-				exact h,
-			},
-		},
-	},
-	exact (not_iff_self (x ∈ B)).mp (iff.symm this),
-end
 
 def eval_class (φ : relation) [φ_func : class_function φ] (x : Set) := 
 classical.some (φ_func.is_func x)
@@ -2790,7 +2730,7 @@ begin
 	},
 end
 
-@[simp]lemma ord_not_lt_iff {α β : Set} [ordinal α] [ordinal β] : ¬α < β ↔ β ≤ α :=
+@[simp]lemma ord_not_lt_iff {α β : Set} [α_ord :ordinal α] [ordinal β] : ¬α < β ↔ β ≤ α :=
 begin 
 	rw ← ord_not_le_iff,
 	simp,
@@ -3314,12 +3254,12 @@ begin
 	},
 end
 
-def dict_order (X Y : Set) (rX rY : relation) : relation :=
+def dict_order (rX rY : relation) : relation :=
  λp1 p2 , ∃a b a' b', (p1 = ord_pair a b ∧ p2 = ord_pair a' b' ∧
  (rX a a' ∨ (a = a' ∧ rY b b')))
 
-lemma dict_pair (X Y : Set) (rX rY : relation) (a b a' b' : Set) :
-(dict_order X Y rX rY) (ord_pair a b) (ord_pair a' b') ↔ (rX a a' ∨ (a = a' ∧ rY b b'))
+lemma dict_pair (rX rY : relation) (a b a' b' : Set) :
+(dict_order rX rY) (ord_pair a b) (ord_pair a' b') ↔ (rX a a' ∨ (a = a' ∧ rY b b'))
 := 
 begin 
 	unfold dict_order,
@@ -3343,7 +3283,7 @@ begin
 end
 
 lemma dict_wo {X Y : Set} {rX rY : relation} (X_wo : well_order X rX) (Y_wo : well_order Y rY) :
-well_order (X × Y) (dict_order X Y rX rY) :=
+well_order (X × Y) (dict_order rX rY) :=
 begin 
 	fconstructor,
 	{
@@ -4965,6 +4905,9 @@ end
 lemma type_of_ord {α : Set} (α_ord : ordinal α) : type α (∈) = α :=
 eq.symm (type_unique α_ord (ord_isomorphism_self α (∈)))
 
+lemma type_of_type (A : Set) (R : relation) : type (type A R) (∈) = type A R :=
+type_of_ord (type_ord A R)
+
 lemma type_eq_iff {A B : Set} {r1 r2 : relation} (A_wo : well_order A r1) 
 (B_wo : well_order B r2) : 
 type A r1 = type B r2 ↔ order_isomorphic {set := A, r := r1} {set := B, r := r2} :=
@@ -4992,19 +4935,105 @@ end
 instance : has_zero Set := ⟨∅⟩
 instance : has_one Set := ⟨succ ∅⟩
 
+
 def ord_sum (α β : Set) : Set := 
 type ((sing ∅ × α) ∪ (sing 1 × β)) 
-(dict_order (succ 1) (α ∪ β) (∈) (∈))
+(dict_order (∈) (∈))
 
 instance : has_add Set := ⟨λ a b, ord_sum a b⟩
 
-lemma ord_sum_is_ord {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) :
+def ord_sum_set (α β : Set) : Set := (sing ∅ × α) ∪ (sing 1 × β)
+def ord_sum_order (α β : Set) := (dict_order (∈) (∈))
+
+lemma wo_of_sing {x : Set} {R : relation} (h : ¬R x x) : well_order (sing x) (R) :=
+{
+	irrfl := begin 
+		intros y hy,
+		rw mem_sing at hy,
+		rwa hy,
+	end,
+	tran := begin 
+		intros a b c ha hb hc hab hbc,
+		exfalso,
+		rw mem_sing at *,
+		rw [ha, hb] at hab,
+		exact h hab,
+	end,
+	tri := begin 
+		intros a b ha hb,
+		rw mem_sing at *,
+		finish,
+	end,
+	wf := begin 
+		intros X X_ss X_nonempty,
+		use x,
+		cases nonempty_has_mem X_nonempty with y hy,
+		have := X_ss hy,
+		rw mem_sing at this,
+		rw← this,
+		use hy,
+
+		intros a ha,
+		have t1 := X_ss ha,
+		rw mem_sing at t1,
+		rw [t1, this],
+		exact h,
+	end,
+}
+
+lemma one_ord : ordinal (1:Set) := succ_of_ordinal_is_ordinal empty_is_ordinal
+
+lemma wo_of_ord_sum_set {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) :
+ well_order (ord_sum_set α β) (ord_sum_order α β) :=
+begin 
+	have h_ss : ord_sum_set α β ⊆ ((succ 1) × (α ∪ β)),
+	{
+		intros p hp,
+		unfold ord_sum_set at hp,
+		rw mem_pair_union at hp,
+		rw mem_prod,
+		cases hp,
+		{
+			rw mem_prod at hp,
+			rcases hp with ⟨a, b, ha, hb, hab⟩,
+			rw mem_sing at ha,
+			use [a, b],
+			rw ha at *,
+			have t1 := (lt_succ_self ∅),
+			have t2 := (lt_succ_self (succ ∅)),
+			have ss_ord := succ_of_ordinal_is_ordinal 
+			(succ_of_ordinal_is_ordinal (empty_is_ordinal)),
+			use ss_ord.tran t2 t1,
+			rw mem_pair_union,
+			exact ⟨or.inl hb, hab⟩,
+		},
+		{
+			rw mem_prod at hp,
+			rcases hp with ⟨a, b, ha, hb, hab⟩,
+			rw mem_sing at ha,
+			use [a, b],
+			rw ha at *,
+			use lt_succ_self (succ ∅),
+			rw mem_pair_union,
+			exact ⟨or.inr hb, hab⟩,
+		},
+	},
+
+	exact wo_of_is_wo 
+	(subset_of_wo_is_wo h_ss 
+	(dict_wo (succ_of_ordinal_is_ordinal (one_ord)).wo (pair_union_ordinal α_ord β_ord).wo)),
+end
+
+lemma ord_of_ord_sum (α β : Set) :
 ordinal (α + β) := by apply type_ord
 
-def ord_prod (α β : Set) : Set := type (β × α) (dict_order β α (∈) (∈))
+def ord_prod (α β : Set) : Set := type (β × α) (dict_order (∈) (∈))
 instance : has_mul Set := ⟨λ a b, ord_prod a b⟩
 
-lemma ord_prod_is_ord {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) :
+def ord_prod_set (α β : Set) : Set := β × α
+def ord_prod_order (α β : Set):= dict_order (∈) (∈)
+
+lemma ord_prod_is_ord (α β : Set) :
 ordinal (α * β) := by apply type_ord
 
 lemma prod_empty (X : Set) : X × ∅ = ∅ :=
@@ -5044,10 +5073,10 @@ end
 lemma ord_sum_zero {α : Set} (α_ord : ordinal α) : α + 0 = α :=
 begin 
 	unfold has_add.add ord_sum has_zero.zero,
-	rw [prod_empty, union_empty, union_empty],
+	rw [prod_empty, union_empty],
 
 	have h_iso : order_isomorphic {set := α, r := (∈)}
-	{set := sing ∅ × α, r := dict_order (succ 1) α has_mem.mem has_mem.mem},
+	{set := sing ∅ × α, r := dict_order has_mem.mem has_mem.mem},
 	{
 		let φ := λx y, y = ord_pair ∅ x,
 		have φ_func : class_function_on_set φ α,
@@ -5061,7 +5090,7 @@ begin
 		},
 		rcases set_func_of_class_func φ_func with ⟨f, f_func, f_dom, f_φ⟩,
 		have f_iso : order_isomorphism f α (∈) (sing ∅ × α) 
-		(dict_order (succ 1) α (∈) (∈)) :=
+		(dict_order (∈) (∈)) :=
 		{
 			f_func := f_func,
 			f_domain := f_dom,
@@ -5150,8 +5179,6 @@ begin
 	exact eq.symm (type_unique α_ord (inverse_order_isomorphism f_iso)),
 end
 
-lemma one_ord : ordinal 1 := succ_of_ordinal_is_ordinal (empty_is_ordinal)
-
 lemma zero_ne_one : (0:Set) ≠ 1 :=
 begin 
 	intro h,
@@ -5234,7 +5261,7 @@ lemma ord_not_le_of_lt {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β)
 lemma ord_lt_of_not_le {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) : ¬α ≤ β → β < α :=
 (ord_not_le_iff α β).mp
 
-lemma ord_lt_of_le_of_lt {α β γ : Set} (α_ord : ordinal α) (β_ord : ordinal β) 
+lemma ord_lt_of_le_of_lt {α β γ : Set}
 (γ_ord : ordinal γ) : α ≤ β → β < γ → α < γ :=
 begin 
 	intros hab hby,
@@ -5245,6 +5272,21 @@ begin
 		exact hby,
 	},
 end
+
+lemma ord_lt_of_lt_of_le {α β γ : Set}
+(γ_ord : ordinal γ) : α < β → β ≤ γ → α < γ :=
+begin 
+	intros hab hby,
+	cases hby,
+	{exact γ_ord.tran hby hab},
+	{
+		rw← hby,
+		exact hab,
+	},
+end
+
+lemma ord_lt_of_lt_of_lt {α β γ : Set}
+(γ_ord : ordinal γ) : α < β → β < γ → α < γ := λhab hby, γ_ord.tran hby hab
 
 lemma le_of_lt_succ : ∀{a b : Set}, a < succ b → a ≤ b :=
 begin 
@@ -5365,88 +5407,96 @@ begin
 	exact ord_not_le_of_lt (f_ord (f @@ ξ)) (f_ord ξ) contra1 contra2,
 end
 
-lemma ord_sum_succ {α β: Set} (α_ord : ordinal α) (β_ord : ordinal β) :
-α + succ β = succ (α + β) := 
-begin
-
-	let φ := λx y, ∃(a b : Set), (x = ord_pair a b ∧ (
-	 ((a = 0 ∨ b ∈ β) ∧ y = b) ∨
-	 (a = 1 ∧ b = β ∧ y = α + β)
-	)),
-
-	have φ_func : class_function_on_set φ ((sing ∅ × α) ∪ (sing 1 × succ β)),
-	{
-		fconstructor,
-		intros x hx,
-		rw mem_pair_union at hx,
-		cases hx,
+lemma restriction_isomorphism {A B f : Set} {r1 r2 : relation} 
+(f_iso : order_isomorphism f A r1 B r2) (X : Set) :
+ order_isomorphism (set_restriction f (X ∩ A)) 
+ (X ∩ A) r1 (range (set_restriction f (X ∩ A))) r2 :=
+{
+	f_func := is_func_restriction f_iso.f_func (X ∩ A),
+	f_domain := begin 
+		rw [@domain_of_restriction f (X ∩ A) f_iso.f_func, f_iso.f_domain],
+		ext x,
+		rw [mem_pair_inter, mem_pair_inter],
+		tauto,
+	end,
+	f_range := rfl,
+	f_injective := begin 
+		rw injective_iff (is_func_restriction f_iso.f_func (X ∩ A)),
+		intros x y x_dom y_dom hxy,
+		have h_dom : domain (set_restriction f (X ∩ A)) = X ∩ A,
 		{
-			rw mem_prod at hx,
-			rcases hx with ⟨a, b, ha, hb, hab⟩,
-			rw mem_sing at ha,
-			use [b, a, b, hab, or.inl ha],
-			intros z hz,
-			rcases hz with ⟨c, d, hcd, hz⟩,
-			rw hcd at hab,
-			rw ord_pair_eq_iff at hab,
-			rw hab.1 at hz,
-			rw hab.2 at hz,
-			cases hz,
-			{exact eq.symm hz.2},
-			{
-				exfalso,
-				rw hz.1 at ha,
-				have := lt_succ_self ∅,
-				unfold has_one.one at ha,
-				rw ha at this,
-				unfold has_lt.lt at this,
-				exact not_mem_empty this,
-			},
+			rw [@domain_of_restriction f (X ∩ A) f_iso.f_func, f_iso.f_domain],
+			ext x,
+			rw [mem_pair_inter, mem_pair_inter],
+			tauto,
 		},
+
+		rw h_dom at x_dom y_dom,
+		rw← restriction_agrees f_iso.f_func x_dom at hxy,
+		rw← restriction_agrees f_iso.f_func y_dom at hxy,
+
+		have h_ss := pair_inter_subset_right X A,
+		rw← f_iso.f_domain at *,
+
+		have := f_iso.f_injective,
+		rw injective_iff f_iso.f_func at this,
+		exact this (h_ss x_dom) (h_ss y_dom) hxy,
+	end,
+	f_isomorphism := begin 
+		intros x y x_dom y_dom,
+
+		have h_ss := pair_inter_subset_right X A,
+
+		rw← restriction_agrees f_iso.f_func x_dom,
+		rw← restriction_agrees f_iso.f_func y_dom,
+		exact f_iso.f_isomorphism (h_ss x_dom) (h_ss y_dom),
+	end
+}
+
+lemma type_le_of_subset_wo {A X : Set} {R : relation} (A_wo : well_order A R) (X_ss : X ⊆ A) :
+type X R ≤ type A R :=
+begin 
+	have f_isoA := type_iso A_wo,
+	set f := (type_isomorphism A_wo),
+
+	have h_inter : X ∩ A = X,
+	{
+		rw eq_iff_subsets,
+		split,
+		{exact pair_inter_subset_left X A},
 		{
-			rw mem_prod at hx,
-			rcases hx with ⟨a, b, ha, hb, hab⟩,
-			rw mem_succ at hb,
-			cases hb,
-			{
-				use [b, a, b, hab, or.inr hb],
-				intros z hz,
-				rcases hz with ⟨c, d, hcd, hz⟩,
-				rw hcd at hab,
-				rw ord_pair_eq_iff at hab,
-				rw [hab.1, hab.2] at hz,
-				cases hz,
-				{exact eq.symm hz.2},
-				{
-					exfalso,
-					rw hz.2.1 at hb,
-					exact ord_not_mem_self (mem_ON_of_ord β_ord) hb,
-				},
-			},
-			{
-				rw mem_sing at ha,
-				use [α + β, a, b, hab, by tauto],
-				intros z hz,
-				rcases hz with ⟨c, d, hcd, hz⟩,
-				rw hcd at hab,
-				rw ord_pair_eq_iff at hab,
-				rw hab.1 at hz,
-				rw hab.2 at hz,
-				cases hz,
-				{
-					cases hz.1,
-					{rw h at ha, exfalso, exact zero_ne_one ha},
-					{rw hb at h, exfalso, exact ord_not_mem_self (mem_ON_of_ord β_ord) h}
-				},
-				{exact eq.symm hz.2.2},
-			},
+			intros x hx,
+			rw mem_pair_inter,
+			exact ⟨hx, X_ss hx⟩,
 		},
 	},
 
-	rcases set_func_of_class_func φ_func with ⟨f, f_func, f_domain, f_φ⟩,
-	have f_iso : order_isomorphism f
-	((sing ∅ × α) ∪ (sing 1 × succ β)) (dict_order (succ 1) (α ∪ (succ β)) (∈) (∈)) 
-	(succ (α + β)) (∈) :=
+	have f_isoX := restriction_isomorphism f_isoA X,
+	rw h_inter at f_isoX,
+
+	have h_range := range_restriction_subset f_isoA.f_func X,
+	rw f_isoA.f_range at h_range,
+
+	rw type_unique' f_isoX,
+	exact type_le_of_subset (type_ord A R) h_range,
+end
+
+lemma ord_le_iff_ss {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) : α ≤ β ↔ α ⊆ β :=
+(le_iff_subset (mem_ON_of_ord α_ord) (mem_ON_of_ord β_ord)).symm
+
+lemma le_sum_right {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) : β ≤ α + β :=
+begin
+	let φ := λx y, y = ord_pair 1 x,
+	have φ_func : class_function_on_set φ β,
+	{
+		fconstructor,
+		intros x hx,
+		use [ord_pair 1 x, rfl, λz hz, eq.symm hz],
+	},
+
+	rcases set_func_of_class_func φ_func with ⟨f, f_func, f_domain, hfφ⟩,
+
+	have f_iso : order_isomorphism f β (∈) (sing 1 × β) (dict_order (∈) (∈)) :=
 	{
 		f_func := f_func,
 		f_domain := f_domain,
@@ -5456,62 +5506,952 @@ begin
 			split,
 			{
 				intro h,
-				rcases h with ⟨x, x_dom, hxy⟩,
+				rcases h with ⟨x, x_dom, hxf⟩,
+				rw hxf,
+				rw← f_domain at hfφ,
+				have := (hfφ (f @@ x) x_dom).mp rfl,
+				change f @@ x = ord_pair 1 x at this,
+				rw [this, mem_prod_pair, mem_sing],
 				rw f_domain at x_dom,
-				have hxf := (f_φ (f @@ x) x_dom).mp rfl,
-				rw hxy,
-				rcases hxf with ⟨a, b, hab, hφx⟩,
-				rw hab at x_dom,
-				rw [mem_pair_union, mem_prod_pair, mem_prod_pair, mem_sing, mem_sing] at x_dom,
-				cases hφx,
+				exact ⟨rfl, x_dom⟩,				
+			},
+			{
+				intro h,
+				rw mem_prod at h,
+				rcases h with ⟨a, b, ha, hb, hab⟩,
+				rw mem_sing at ha,
+				rw ha at *,
+				rw f_domain,
+				use [b, hb],
+				rw hab,
+				exact eq.symm ((hfφ (f @@ b) hb).mp rfl),
+			},
+		end,
+		f_injective := begin 
+			rw injective_iff f_func,
+			intros x y x_dom y_dom hfxy,
+			rw← f_domain at hfφ,
+
+			have hfx := (hfφ (f @@ x) x_dom).mp rfl,
+			have hfy := (hfφ (f @@ y) y_dom).mp rfl,
+
+			change f @@ x = ord_pair 1 x at hfx,
+			change f @@ y = ord_pair 1 y at hfy,
+			
+			rw hfx at hfxy,
+			rw hfy at hfxy,
+
+			rw ord_pair_eq_iff at hfxy,
+			exact hfxy.2,
+		end,
+		f_isomorphism := begin 
+			intros x y x_dom y_dom,
+
+			have hfx := (hfφ (f @@ x) x_dom).mp rfl,
+			have hfy := (hfφ (f @@ y) y_dom).mp rfl,
+
+			change f @@ x = ord_pair 1 x at hfx,
+			change f @@ y = ord_pair 1 y at hfy,
+
+			rw [hfx, hfy],
+			rw dict_pair has_mem.mem has_mem.mem,
+			have temp : ¬((1:Set) ∈ (1:Set)),
+			{
+				intro h,
+				unfold has_one.one at h,
+				have := succ_increasing empty_is_ordinal empty_is_ordinal,
+				unfold has_lt.lt at this,
+				rw← this at h,
+				exact not_mem_empty h,
+			},
+			simp [temp],
+		end
+	},
+
+	have h_ss : (sing 1 × β) ⊆ ord_sum_set α β,
+	{
+		intros x hx,
+		unfold ord_sum_set,
+		rw mem_pair_union,
+		exact or.inr hx,
+	},
+
+	have h_ord := (type_ord (ord_sum_set α β) (ord_sum_order α β)),
+	have h_wo : well_order (ord_sum_set α β) (ord_sum_order α β)
+	:= wo_of_ord_sum_set α_ord β_ord,
+
+	have := type_le_of_subset_wo h_wo h_ss,
+	unfold ord_sum_order at this,
+	rw ←type_unique' f_iso at this,
+	unfold has_add.add ord_sum,
+	rw type_of_ord β_ord at this,
+	exact this,
+end
+
+lemma le_sum_left {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) : α ≤ α + β :=
+begin
+	let φ := λx y, y = ord_pair 0 x,
+	have φ_func : class_function_on_set φ α,
+	{
+		fconstructor,
+		intros x hx,
+		use [ord_pair 0 x, rfl, λz hz, eq.symm hz],
+	},
+
+	rcases set_func_of_class_func φ_func with ⟨f, f_func, f_domain, hfφ⟩,
+
+	have f_iso : order_isomorphism f α (∈) (sing 0 × α) (dict_order (∈) (∈)) :=
+	{
+		f_func := f_func,
+		f_domain := f_domain,
+		f_range := begin
+			ext y,
+			rw mem_range_iff f_func,
+			split,
+			{
+				intro h,
+				rcases h with ⟨x, x_dom, hxf⟩,
+				rw hxf,
+				rw← f_domain at hfφ,
+				have := (hfφ (f @@ x) x_dom).mp rfl,
+				change f @@ x = ord_pair 0 x at this,
+				rw [this, mem_prod_pair, mem_sing],
+				rw f_domain at x_dom,
+				exact ⟨rfl, x_dom⟩,				
+			},
+			{
+				intro h,
+				rw mem_prod at h,
+				rcases h with ⟨a, b, ha, hb, hab⟩,
+				rw mem_sing at ha,
+				rw ha at *,
+				rw f_domain,
+				use [b, hb],
+				rw hab,
+				exact eq.symm ((hfφ (f @@ b) hb).mp rfl),
+			},
+		end,
+		f_injective := begin 
+			rw injective_iff f_func,
+			intros x y x_dom y_dom hfxy,
+			rw← f_domain at hfφ,
+
+			have hfx := (hfφ (f @@ x) x_dom).mp rfl,
+			have hfy := (hfφ (f @@ y) y_dom).mp rfl,
+
+			change f @@ x = ord_pair 0 x at hfx,
+			change f @@ y = ord_pair 0 y at hfy,
+			
+			rw hfx at hfxy,
+			rw hfy at hfxy,
+
+			rw ord_pair_eq_iff at hfxy,
+			exact hfxy.2,
+		end,
+		f_isomorphism := begin 
+			intros x y x_dom y_dom,
+
+			have hfx := (hfφ (f @@ x) x_dom).mp rfl,
+			have hfy := (hfφ (f @@ y) y_dom).mp rfl,
+
+			change f @@ x = ord_pair 0 x at hfx,
+			change f @@ y = ord_pair 0 y at hfy,
+
+			rw [hfx, hfy],
+			rw dict_pair  has_mem.mem has_mem.mem,
+			have temp : ¬((0:Set) ∈ (0:Set)),
+			{
+				intro h,
+				unfold has_zero.zero at h,
+				exact not_mem_empty h,
+			},
+			simp [temp],
+		end
+	},
+
+	have h_ss : (sing 0 × α) ⊆ ord_sum_set α β,
+	{
+		intros x hx,
+		unfold ord_sum_set,
+		rw mem_pair_union,
+		exact or.inl hx,
+	},
+
+	have h_ord := (type_ord (ord_sum_set α β) (ord_sum_order α β)),
+	have h_wo : well_order (ord_sum_set α β) (ord_sum_order α β)
+	:= wo_of_ord_sum_set α_ord β_ord,
+
+	have := type_le_of_subset_wo h_wo h_ss,
+	unfold ord_sum_order at this,
+	rw ←type_unique' f_iso at this,
+	unfold has_add.add ord_sum,
+	rw type_of_ord α_ord at this,
+	exact this,
+end
+
+lemma mem_func_of_mem_domain {f x : Set} (f_func : set_function f) (x_dom : x ∈ domain f) :
+ord_pair x (f @@ x) ∈ f := func_spec f_func x_dom
+
+
+lemma ordinal_of_mem_ordinal {α : Set} (α_ord : ordinal α) {b : Set} (h : b ∈ α) : ordinal b :=
+ord_of_mem_ON (mem_of_ordinal_is_ordinal (mem_ON_of_ord α_ord) h)
+
+lemma ord_sum_succ {α β : Set} (α_ord : ordinal α) (β_ord : ordinal β) :
+α + succ β = succ (α + β) := 
+begin 
+	have f_iso := (type_iso (wo_of_ord_sum_set α_ord β_ord)),
+	set f := type_isomorphism (wo_of_ord_sum_set α_ord β_ord),
+
+	let g := f ∪ sing (ord_pair (ord_pair 1 β) (α + β)),
+	have g_func : set_function g,
+	{
+		fconstructor,
+		intros p hp,
+		rw mem_pair_union at hp,
+		cases hp,
+		{
+			rcases f_iso.f_func.is_func hp with ⟨b, a, hab⟩,
+
+			have a_dom : a ∈ domain f,
+			{
+				rw hab.1 at hp,
+				rw mem_domain,
+				use [b, hp],
+			},
+
+			have b_range : b ∈ range f,
+			{
+				rw hab.1 at hp,
+				rw mem_range,
+				use [a, hp],
+			},
+
+
+			use [b, a, hab.1],
+			intros c hc,
+			rw mem_pair_union at hc,
+			cases hc,
+			{exact hab.2 hc},
+			{
+				exfalso,
+				rw mem_sing at hc,
+				rw ord_pair_eq_iff at hc,
+				rw f_iso.f_domain at a_dom,
+				unfold ord_sum_set at a_dom,
+				rw mem_pair_union at a_dom,
+				rw hc.1 at *,
+				rw [mem_prod_pair, mem_prod_pair, mem_sing, mem_sing] at a_dom,
+				cases a_dom,
 				{
-					sorry,
+					exact zero_ne_one (eq.symm a_dom.1),
+				},
+				{exact ord_not_mem_self (mem_ON_of_ord β_ord) a_dom.2},
+			},
+		},
+		{
+			rw mem_sing at hp,
+			use [α+β, ord_pair 1 β, hp],
+			intros c hc,
+			rw mem_pair_union at hc,
+			cases hc,
+			{
+				exfalso,
+				have : ord_pair 1 β ∈ domain f,
+				{
+					rw mem_domain,
+					use c,
+					exact hc,
+				},
+				rw f_iso.f_domain at this,
+				unfold ord_sum_set at this,
+				rw [mem_pair_union, mem_prod_pair] at this,
+				cases this,
+				{
+					rw mem_sing at this,
+					exact zero_ne_one (eq.symm this.1),
 				},
 				{
-					rw hφx.2.2,
-					exact lt_succ_self (α+β),
+					rw mem_prod_pair at this,
+					exact ord_not_mem_self (mem_ON_of_ord β_ord) this.2,
+				},
+			},
+			{
+				rw mem_sing at hc,
+				rw ord_pair_eq_iff at hc,
+				rw ord_pair_eq_iff at hc,
+				exact eq.symm hc.2,
+			},
+		},
+	},
+
+	have g_domain : domain g = domain f ∪ sing (ord_pair 1 β),
+	{
+		ext x,
+		split,
+		{
+			intro h,
+			rw mem_domain at h,
+			cases h with b hb,
+			rw mem_pair_union at hb,
+			rw mem_pair_union,
+			cases hb,
+			{
+				left,
+				rw mem_domain,
+				use [b, hb],
+			},
+			{
+				right,
+				rw mem_sing at *,
+				rw ord_pair_eq_iff at hb,
+				exact hb.1,
+			},
+		},
+		{
+			intro h,
+			rw mem_pair_union at h,
+			rw mem_domain at h ⊢,
+			cases h,
+			{
+				cases h with b hb,
+				use b,
+				rw mem_pair_union,
+				exact or.inl hb,
+			},
+			{
+				rw mem_sing at h,
+				use α + β,
+				rw mem_pair_union,
+				rw mem_sing,
+				rw ord_pair_eq_iff,
+				exact or.inr ⟨h, rfl⟩,
+			},
+		},
+	},
+
+	have hfg : ∀⦃x⦄, x ≠ ord_pair 1 β → g @@ x = f @@ x,
+	{
+		intros x hx,
+		by_cases x ∈ domain f,
+		{
+			have : ord_pair x (f @@ x) ∈ g,
+			{
+				rw mem_pair_union,
+				exact or.inl (mem_func_of_mem_domain f_iso.f_func h),
+			},
+
+			exact eq.symm (func_unique g_func this),
+		},
+		{
+			rw func_out (@not_and_of_not_right (is_set_function f) (x ∈ domain f) h),
+			have : x ∉ domain g,
+			{
+				intro h2,
+				rw g_domain at h2,
+				rw mem_pair_union at h2,
+				rw mem_sing at h2,
+				have : x = ord_pair 1 β := by tauto,
+				exact hx this,
+			},
+			rw func_out (@not_and_of_not_right (is_set_function g) (x ∈ domain g) this),
+		},
+	},
+
+	have hfg_2 : ∀⦃x⦄, x ∈ domain f → g @@ x = f @@ x,
+	{
+		intros x hx,
+		have : x ≠ ord_pair 1 β,
+		{
+			intro x_eq,
+			rw f_iso.f_domain at hx,
+			unfold ord_sum_set at hx,
+			rw mem_pair_union at hx,
+			rw x_eq at hx,
+			rw mem_prod_pair at hx,
+			cases hx,
+			{
+				rw mem_sing at hx,
+				exact zero_ne_one (eq.symm hx.1),
+			},
+			{
+				rw mem_prod_pair at hx,
+				exact ord_not_mem_self (mem_ON_of_ord β_ord) hx.2,
+			},
+		},
+			exact hfg this,
+	},
+
+	have h_ss : sing ∅ × α ∪ sing 1 × β ⊆ sing ∅ × α ∪ sing 1 × succ β,
+	{
+		intros p hp,
+		rw [mem_pair_union, mem_prod, mem_prod] at hp ⊢,
+		cases hp,
+		{exact or.inl hp},
+		{
+			right,
+			rcases hp with ⟨a, b, ha, hb, hab⟩,
+			use [a, b, ha],
+			exact ⟨ord_lt_of_lt_of_lt (succ_of_ordinal_is_ordinal β_ord) hb (lt_succ_self β), hab⟩,
+		},
+	},
+
+	have hg_oneβ : g @@ (ord_pair 1 β) = α + β,
+	{
+		have : (ord_pair (ord_pair 1 β) (α + β)) ∈ g,
+		{
+			rw mem_pair_union,
+			rw mem_sing,
+			right,
+			refl,
+		},
+
+		exact eq.symm (func_unique g_func this),
+	},
+
+	have g_isomorphism : ∀ ⦃a1 a2 : Set⦄, a1 ∈ ord_sum_set α (succ β) → 
+	a2 ∈ ord_sum_set α (succ β) → (ord_sum_order α (succ β) a1 a2 ↔ g @@ a1 ∈ g @@ a2),
+	{
+			intros p1 p2 hp1 hp2,
+			have hp1' := hp1,
+			have hp2' := hp2,
+			unfold ord_sum_set at hp1 hp2,
+			rw [mem_pair_union, mem_prod, mem_prod] at hp1 hp2,
+			cases hp1,
+			{
+				rcases hp1 with ⟨a, b, ha, hb, hab⟩,
+				rw mem_sing at ha,
+				rw ha at *, clear ha a,
+				have p1_ne : p1 ≠ ord_pair 1 β,
+				{
+					intro p1_eq,
+					rw hab at p1_eq,
+					rw ord_pair_eq_iff at p1_eq,
+					exact zero_ne_one p1_eq.1,
+				},
+
+				have hp1_dom : p1 ∈ ord_sum_set α β,
+					{
+						unfold ord_sum_set,
+						rw mem_pair_union,
+						left,
+						rw hab,
+						rw mem_prod_pair,
+						rw mem_sing,
+						exact ⟨rfl, hb⟩,
+					},
+
+				rw hfg p1_ne,
+
+				cases hp2,
+				{
+					rcases hp2 with ⟨a, c, ha, hc, hac⟩,
+					rw mem_sing at ha,
+					rw ha at *, clear ha a,
+
+					have p2_ne : p2 ≠ ord_pair 1 β,
+					{
+						intro p2_eq,
+						rw hac at p2_eq,
+						rw ord_pair_eq_iff at p2_eq,
+						exact zero_ne_one p2_eq.1,
+					},
+
+					rw hfg p2_ne,
+					have hp2_dom : p2 ∈ ord_sum_set α β,
+					{
+						unfold ord_sum_set,
+						rw mem_pair_union,
+						left,
+						rw hac,
+						rw mem_prod_pair,
+						rw mem_sing,
+						exact ⟨rfl, hc⟩,
+					},
+					rw← f_iso.f_isomorphism hp1_dom hp2_dom,
+					refl,
+				},
+				{
+					rcases hp2 with ⟨a, c, ha, hc, hac⟩,
+					rw mem_sing at ha,
+					rw ha at *, clear ha a,
+					rw mem_succ at hc,
+					cases hc,
+					{
+						have p2_ne : p2 ≠ ord_pair 1 β,
+						{
+							intro p2_eq,
+							rw hac at p2_eq,
+							rw ord_pair_eq_iff at p2_eq,
+							rw p2_eq.2 at hc,
+							exact ord_not_mem_self (mem_ON_of_ord β_ord) hc,
+						},
+
+						rw hfg p2_ne,
+						have hp2_dom : p2 ∈ ord_sum_set α β,
+						{
+							unfold ord_sum_set,
+							rw mem_pair_union,
+							right,
+							rw hac,
+							rw mem_prod_pair,
+							rw mem_sing,
+							exact ⟨rfl, hc⟩,
+						},
+
+						rw← f_iso.f_isomorphism hp1_dom hp2_dom,
+						refl,
+
+					},
+					{
+						rw hc at *,
+						rw hac,
+						rw hg_oneβ,
+						unfold has_add.add ord_sum,
+						unfold ord_sum_set ord_sum_order at f_iso hp1_dom,
+						rw← f_iso.f_range,
+						rw← f_iso.f_domain at hp1_dom, 
+						have := mem_range_of_mem_dom f_iso.f_func hp1_dom,
+						split,
+						{exact λh, this},
+						{
+							intro h,
+							unfold ord_sum_order,
+							rw hab,
+							rw dict_pair,
+							left,
+							unfold has_one.one,
+							exact lt_succ_self ∅,
+						},
+					},
+				},
+			},
+			{
+				rcases hp1 with ⟨a, b, ha, hb, hab⟩,
+				rw mem_sing at ha, rw ha at *, clear ha a,
+				rw mem_succ at hb,
+				cases hb,
+				{
+					have p1_ne : p1 ≠ ord_pair 1 β,
+					{
+						intro p1_eq,
+						rw p1_eq at hab,
+						rw ord_pair_eq_iff at hab,
+						rw← hab.2 at hb,
+						exact ord_not_mem_self (mem_ON_of_ord β_ord) hb,
+					},
+					rw hfg p1_ne,
+					cases hp2,
+					{
+						rcases hp2 with ⟨c, d, hc, hd, hcd⟩,
+						rw mem_sing at hc, rw hc at *, clear hc c,
+						split,
+						{
+							intro h,
+							unfold ord_sum_order at h,
+							rw [hab, hcd, dict_pair] at h,
+							exfalso,
+							cases h,
+							{exact not_mem_empty h},
+							{exact zero_ne_one (eq.symm h.1)},
+						},
+						{
+							intro h,
+							have p2_ne : p2 ≠ ord_pair 1 β,
+							{
+								intro p2_eq,
+								rw p2_eq at hcd,
+								rw ord_pair_eq_iff at hcd,
+								exact zero_ne_one (eq.symm hcd.1),
+							},
+
+							have hp1_dom : p1 ∈ ord_sum_set α β,
+							{
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								right,
+								rw hab,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hb⟩,
+							},
+
+
+							have hp2_dom : p2 ∈ ord_sum_set α β,
+							{
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								left,
+								rw hcd,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hd⟩,
+							},
+
+							rw hfg p2_ne at h,
+							rw← f_iso.f_isomorphism hp1_dom hp2_dom at h,
+							unfold ord_sum_order at *,
+							exact h,
+						},
+					},
+					{
+						rcases hp2 with ⟨c, d, hc, hd, hcd⟩,
+						rw mem_sing at hc, rw hc at *, clear hc c,
+						unfold ord_sum_order,
+						rw mem_succ at hd,
+						cases hd,
+						{
+							have p2_ne : p2 ≠ ord_pair 1 β,
+							{
+								intro p2_eq,
+								rw p2_eq at hcd,
+								rw ord_pair_eq_iff at hcd,
+								rw← hcd.2 at hd,
+								exact ord_not_mem_self (mem_ON_of_ord β_ord) hd,
+							},
+							have hp1_dom : p1 ∈ ord_sum_set α β,
+							{
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								right,
+								rw hab,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hb⟩,
+							},
+
+							have hp2_dom : p2 ∈ ord_sum_set α β,
+							{
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								right,
+								rw hcd,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hd⟩,
+							},
+
+							rw hfg p2_ne,
+							rw← f_iso.f_isomorphism hp1_dom hp2_dom,
+							refl,
+						},
+						{
+						have hp1_dom : p1 ∈ ord_sum_set α β,
+							{
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								right,
+								rw hab,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hb⟩,
+							},
+							rw hd at hcd,
+							rw hcd,
+							rw hg_oneβ,
+							unfold has_add.add ord_sum,
+							unfold ord_sum_set ord_sum_order at f_iso hp1_dom,
+							rw← f_iso.f_range,
+							rw← f_iso.f_domain at hp1_dom, 
+							split,
+							{exact λh, mem_range_of_mem_dom f_iso.f_func hp1_dom},
+							{
+								intro h,
+								rw hab,
+								rw dict_pair,
+								exact or.inr ⟨rfl, hb⟩,
+							},
+						},
+					},
+				},
+				{
+					rw hb at hab,
+					rw [hab, hg_oneβ],
+					cases hp2,
+					{
+						rcases hp2 with ⟨c, d, hc, hd, hcd⟩,
+						rw mem_sing at hc, rw hc at *, clear hc c,
+						have p2_dom : p2 ∈ domain f,
+						{
+								rw f_iso.f_domain,
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								left,
+								rw hcd,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hd⟩,
+						},
+
+						rw hfg_2 p2_dom,
+						have hfp2 : f @@ p2 ∈ α + β,
+						{
+							unfold has_add.add ord_sum,
+							unfold ord_sum_set ord_sum_order at f_iso,
+							rw← f_iso.f_range,
+							exact mem_range_of_mem_domain f_iso.f_func p2_dom,
+						},
+
+						split,
+						{
+							intro h2,
+							unfold ord_sum_order at h2,
+							rw hcd at h2,
+							rw dict_pair at h2,
+							exfalso,
+							cases h2,
+							{exact not_mem_empty h2},
+							{exact zero_ne_one (eq.symm h2.1)},
+						},
+						{
+							intro h2,
+							exfalso,
+							exact not_ord_mem_ord (ord_of_ord_sum α β) h2 hfp2,
+						},
+
+					},
+					{
+						rcases hp2 with ⟨c, d, hc, hd, hcd⟩,
+						rw mem_sing at hc, rw hc at *, clear hc c,
+						rw mem_succ at hd,
+						cases hd,
+						{
+							have hp2_dom : p2 ∈ domain f,
+							{
+								rw f_iso.f_domain,
+								unfold ord_sum_set,
+								rw mem_pair_union,
+								right,
+								rw hcd,
+								rw mem_prod_pair,
+								rw mem_sing,
+								exact ⟨rfl, hd⟩,
+							},
+
+							rw hfg_2 hp2_dom,
+							split,
+							{
+								intro h2,
+								rw hcd at h2,
+								unfold ord_sum_order at h2,
+								rw dict_pair at h2,
+								exfalso,
+								cases h2,
+								{exact ord_not_mem_self (mem_ON_of_ord one_ord) h2},
+								{
+									exact not_ord_mem_ord β_ord h2.2 hd,
+								},
+							},
+							{
+								have hfp2 : f @@ p2 ∈ α + β,
+								{
+									unfold has_add.add ord_sum,
+									unfold ord_sum_set ord_sum_order at f_iso,
+									rw← f_iso.f_range,
+									exact mem_range_of_mem_domain f_iso.f_func hp2_dom,
+								},
+								intro h2, exfalso,
+								exact not_ord_mem_ord (ord_of_ord_sum α β) h2 hfp2,
+							},
+						},
+						{
+							rw hd at hcd,
+							rw hcd,
+							rw hg_oneβ,
+							unfold ord_sum_order,
+							rw dict_pair,
+							split,
+							{
+								intro h2,
+								exfalso,
+								cases h2,
+								{
+									exact ord_not_mem_self (mem_ON_of_ord one_ord) h2,
+								},
+								{
+									exact ord_not_mem_self (mem_ON_of_ord β_ord) h2.2,
+								},
+							},
+							{
+								intro h2,
+								exfalso,
+								exact ord_not_mem_self (mem_ON_of_ord (ord_of_ord_sum α β)) h2,
+							},
+						},
+					},
+				},
+			},
+	},
+
+	have g_domain' : domain g = (ord_sum_set α (succ β)),
+	{
+			rw g_domain,
+			rw f_iso.f_domain,
+			unfold ord_sum_set,
+			ext p,
+			rw [mem_pair_union, mem_pair_union, mem_pair_union] at *,
+			split,
+			{
+				intro h,
+				cases h, cases h,
+				{exact or.inl h},
+				{
+					right,
+					rw mem_prod at *,
+					rcases h with ⟨a, b, ha, hb, hab⟩,
+					use [a, b, ha],
+					exact 
+					⟨ord_lt_of_lt_of_lt (succ_of_ordinal_is_ordinal β_ord) hb (lt_succ_self β), hab⟩,
+				},
+				{
+					rw mem_sing at h,
+					right,
+					rw mem_prod,
+					use [1, β],
+					rw mem_sing,
+					use [rfl, lt_succ_self β, h],
 				},
 			},
 			{
 				intro h,
-				rw mem_succ at h,
 				cases h,
+				{left, left, exact h},
 				{
-					sorry,
+					rw mem_prod at h,
+					rcases h with ⟨a, b, ha, hb, hab⟩,
+					rw mem_sing at ha ⊢,
+					rw ha at hab,
+					rw mem_succ at hb,
+					cases hb,
+					{
+						left, right,
+						rw mem_prod,
+						use [1, b],
+						rw mem_sing,
+						use [rfl, hb, hab],
+					},
+					{rw hb at hab, exact or.inr hab},
+				},
+			},	
+	}, 
+
+	have g_range : range g = succ (α + β),
+	{
+			ext y,
+			rw mem_range_iff g_func,
+			split,
+			{
+				intro h,
+				rcases h with ⟨x, x_dom, hxy⟩,
+				rw hxy,
+				rw [g_domain, mem_pair_union] at x_dom,
+				cases x_dom,
+				{
+					rw hfg_2 x_dom,
+					rw mem_succ, left,
+					unfold has_add.add ord_sum,
+					unfold ord_sum_set ord_sum_order at f_iso,
+					rw← f_iso.f_range,
+					exact mem_range_of_mem_domain f_iso.f_func x_dom,
+				},
+				{
+					rw mem_sing at x_dom,
+					have : ord_pair x (α + β) ∈ g,
+					{
+						rw mem_pair_union,
+						rw x_dom,
+						rw mem_sing,
+						exact or.inr rfl,
+					},
+
+					rw func_unique g_func this,
+					exact lt_succ_self (g @@ x),
+				},
+			},
+			{
+				intros y,
+				rw mem_succ at y,
+				cases y with h,
+				{
+					unfold has_add.add ord_sum at h,
+					unfold ord_sum_set ord_sum_order at f_iso,
+					rw← f_iso.f_range at h,
+					rcases mem_range_is_func f_iso.f_func h with ⟨x, x_dom, hxy⟩,
+					rw← hxy,
+					use x,
+					rw g_domain,
+					rw mem_pair_union,
+					use or.inl x_dom,
+					exact eq.symm (hfg_2 x_dom),
 				},
 				{
 					use ord_pair 1 β,
-					have hdom : ord_pair 1 β ∈ domain f,
+					rw g_domain,
+					rw mem_pair_union,
+					rw mem_sing,
+					use or.inr rfl,
+					rw y_1,
+					have : ord_pair (ord_pair 1 β) (α+β) ∈ g,
 					{
-						rw [f_domain, mem_pair_union, mem_prod_pair, mem_prod_pair, mem_sing, mem_sing],
-						use [or.inr ⟨rfl, lt_succ_self β⟩],
+						rw mem_pair_union,
+						rw mem_sing,
+						exact or.inr rfl,
 					},
-					use [hdom],
-					rw f_domain at hdom,
-					rcases (f_φ (f @@ ord_pair 1 β) hdom).mp rfl with ⟨a, b, hab, hφ⟩,
-					rw ord_pair_eq_iff at hab,
-					rw [←hab.1, ←hab.2] at hφ,
-					cases hφ,
-					{
-						cases hφ.1,
-						exfalso, exact zero_ne_one (eq.symm h_1),
-						exfalso, exact ord_not_mem_self (mem_ON_of_ord β_ord) h_1,
-					},
-					{rw [h, hφ.2.2]},
+					exact func_unique g_func this,
 				},
 			},
+	},
+
+	have g_iso : order_isomorphism g (ord_sum_set α (succ β)) 
+	(ord_sum_order α (succ β)) (succ (α + β)) (∈) :=
+	{
+		f_func := g_func,
+		f_domain := g_domain',
+		f_range := g_range,
+		f_injective := begin 
+			rw injective_iff g_func,
+			intros p1 p2 p1_dom p2_dom hp1p2,
+
+			have p1_dom' := p1_dom,
+			have p2_dom' := p2_dom,
+
+			have gp2_ord : ordinal (g @@ p2),
+			{
+				have : g @@ p2 ∈ range g := mem_range_of_mem_domain g_func p2_dom,
+				rw g_range at this,
+				exact ordinal_of_mem_ordinal (succ_of_ordinal_is_ordinal (ord_of_ord_sum α β)) this,
+			},
+
+			rw g_domain' at p1_dom p2_dom,
+
+			cases (wo_of_ord_sum_set α_ord (succ_of_ordinal_is_ordinal β_ord)).tri p1_dom p2_dom,
+			{
+				exfalso,
+				have := (g_isomorphism p1_dom p2_dom).mp h,
+				rw hp1p2 at this,
+				exact ord_not_mem_self (mem_ON_of_ord gp2_ord) this,
+			},
+			{
+				cases h,
+				{
+					exfalso,
+					have := (g_isomorphism p2_dom p1_dom).mp h,
+					rw hp1p2 at this,
+					exact ord_not_mem_self (mem_ON_of_ord gp2_ord) this,
+				},
+				{exact h}
+			},
 		end,
-		f_injective := sorry,
-		f_isomorphism := sorry,
+		f_isomorphism := g_isomorphism,
 	},
 
 	have temp : α + succ β = type (sing ∅ × α ∪ sing 1 × succ β)
-	 (dict_order (succ 1) (α ∪ succ β) has_mem.mem has_mem.mem) := rfl,
+	 (dict_order has_mem.mem has_mem.mem) := rfl,
 	rw temp,
 
 	exact eq.symm
-	 (type_unique (succ_of_ordinal_is_ordinal (ord_sum_is_ord α_ord β_ord)) f_iso),
-end 
+	 (type_unique (succ_of_ordinal_is_ordinal (ord_of_ord_sum α β)) g_iso),
+
+end
 
 lemma one_plus_one : 1 + 1 = succ 1 :=
 begin 
@@ -5521,8 +6461,412 @@ begin
 	exact this,
 end
 
+lemma ord_sum_le_of_le_left {α β γ: Set} (α_ord : ordinal α) (β_ord : ordinal β) (γ_ord : ordinal γ) :
+β ≤ γ → α + β ≤ α + γ :=
+begin
+	intro hβγ,
+	apply type_le_of_subset_wo (wo_of_ord_sum_set α_ord γ_ord),
+	unfold ord_sum_set,
+
+	intros p hp,
+	rw mem_pair_union at hp,
+	cases hp,
+	{
+		rw mem_prod at hp,
+		rcases hp with ⟨a, b, ha, hb, hp⟩,
+		rw mem_sing at ha, rw ha at *, clear ha a,
+		rw hp,
+		rw mem_pair_union,
+		left,
+		rw [mem_prod_pair, mem_sing],
+		exact ⟨rfl, hb⟩,
+	},
+	{
+		rw mem_prod at hp,
+		rcases hp with ⟨a, b, ha, hb, hp⟩,
+		rw mem_sing at ha, rw ha at *, clear ha a,
+		rw hp,
+		rw mem_pair_union,
+		right,
+		rw [mem_prod_pair, mem_sing],
+		exact ⟨rfl, ord_lt_of_lt_of_le γ_ord hb hβγ⟩,
+	},
+end
+
+lemma omega_induction {φ : fclass} (h_base : φ 0) (h_inductive : ∀⦃n⦄, n ∈ ω → φ n → φ (succ n)) :
+∀⦃n⦄, n ∈ ω → φ n :=
+begin 
+	set ψ := λn, n ∈ ω ∧ φ n with ψ_def,
+	have h1 : inductive_class ψ,
+	{
+		unfold inductive_class,
+		split,
+		{
+			unfold has_mem.mem mem_class,
+			rw ψ_def,
+			rw mem_omega,
+			exact ⟨empty_is_nat, h_base⟩,
+		},
+		{
+			intros y hy,
+			unfold has_mem.mem mem_class,
+			rw ψ_def at hy ⊢,
+			unfold has_mem.mem mem_class at hy,
+			split,
+			{
+				rw mem_omega (succ y),
+				have := mem_omega y, unfold has_mem.mem at this,
+				rw this at hy,
+				exact succ_of_nat_is_nat hy.1,
+			},
+			{exact h_inductive hy.1 hy.2,},
+
+		},
+	},
+	have h2 : subclass_set ψ ω := λn h, h.1,
+	rcases induction_class h1 h2 with ⟨I, hI⟩,
+	rw← hI,
+	intros n hn,
+	rw mem_set_of at hn,
+	exact hn.2,
+end
+
+lemma ord_succ_eq_add_one {α : Set} (α_ord : ordinal α) : succ α = α + 1 := 
+begin 
+	unfold has_one.one,
+	rw ord_sum_succ α_ord empty_is_ordinal,
+	have := ord_sum_zero α_ord,
+	unfold has_zero.zero at this,
+	rw this,
+end
+
+lemma ord_of_mem_omega {a : Set} (a_nat : a ∈ ω) : ordinal a := ordinal_of_mem_ordinal omega_ord a_nat
+
+lemma add_closed_omega {a b : Set} (a_nat : a ∈ ω) (b_nat : b ∈ ω) : a + b ∈ ω :=
+begin
+	set φ := λn, a + n ∈ ω with φ_def,
+	have h_base : φ 0 :=
+	begin 
+		rw [φ_def, ord_sum_zero (ord_of_mem_omega a_nat)],
+		exact a_nat,
+	end,
+
+	have h_inductive : ∀⦃n⦄, n ∈ ω → φ n → φ (succ n) :=
+	begin 
+		intros n n_nat hn,
+		rw φ_def at *,
+		rw ord_sum_succ (ord_of_mem_omega a_nat) (ord_of_mem_omega n_nat),
+		rw mem_omega at ⊢ hn,
+		exact succ_of_nat_is_nat hn,
+	end,
+
+	have := (omega_induction h_base h_inductive) b_nat,
+	exact this,
+end
+
+namespace natural
+@[ext]structure natural :=
+(set : Set)
+(nat : set ∈ ω)
+
+def ord_of_nat (a : natural) : ordinal a.set := ord_of_mem_omega a.nat
+
+instance : has_add natural := 
+⟨λa b, ⟨a.set + b.set, add_closed_omega a.nat b.nat⟩⟩
+
+instance : has_zero natural := ⟨⟨0, begin
+	rw mem_omega,
+	exact empty_is_nat,
+end⟩⟩
+
+instance : has_one natural := ⟨⟨1, begin
+	rw mem_omega,
+	exact succ_of_nat_is_nat (empty_is_nat),
+end⟩⟩
+
+lemma eq_of_set_eq {a b : natural} (h : a.set = b.set) : a = b := natural.ext a b h
+
+lemma add_zero (a : natural) : a + 0 = a := 
+begin 
+	have eq := ord_sum_zero (ord_of_nat a),
+	unfold has_add.add at *,
+	have : (0:natural).set = 0 := rfl,
+	rw← this at eq,
+	apply eq_of_set_eq,
+	simp,
+	exact eq,
+end
+
+lemma add_succ (a b : natural) : a + (b + 1) = (a + b) + 1 :=
+begin 
+	have := ord_succ_eq_add_one (ord_of_ord_sum a.set b.set),
+	unfold has_add.add has_one.one at *,
+	simp,
+	rw← this,
+	have := ord_sum_succ (ord_of_nat b) empty_is_ordinal,
+	unfold has_add.add at this,
+	rw this,
+	have := ord_sum_zero (ord_of_nat b),
+	unfold has_add.add has_zero.zero at this,
+	rw this,
+	apply ord_sum_succ,
+	{exact ord_of_nat a},
+	{exact ord_of_nat b},
+end
+
+lemma add_one (a : natural) : a + 1 = ⟨succ a.set, 
+begin 
+	have := a.nat,
+	rw mem_omega at *,
+	exact succ_of_nat_is_nat this,
+end⟩ := 
+begin 
+	apply eq_of_set_eq,
+	simp,
+	rw ord_succ_eq_add_one (ord_of_nat a),
+	refl,
+end
+
+lemma succ_inj {a b : natural} (h : a + 1 = b + 1) : a = b := 
+begin 
+	rw [add_one, add_one] at h,
+	apply eq_of_set_eq,
+	exact succ_inj_on_ON (ord_of_nat a) (natural.mk.inj h),
+end
+
+lemma zero_not_succ (a : natural) : a + 1 ≠ 0 :=
+begin 
+	intro h,
+	rw add_one at h,
+	have := lt_succ_self a.set,
+	rw (natural.mk.inj h) at this,
+	exact not_mem_empty this,
+end
+
+lemma induction (φ : natural → Prop) (h_base : φ 0) 
+(h_inductive : ∀n, φ n → φ (n + 1)) : ∀n, φ n :=
+begin 
+	set ψ := λn, ∃nat, φ ⟨n, nat⟩ with ψ_def,
+	have h1 : ψ 0 :=
+	begin 
+		rw ψ_def,
+		simp,
+		use empty_is_nat,
+		exact h_base,
+	end,
+
+	have h2 : ∀⦃n⦄, n ∈ ω → ψ n → ψ (succ n),
+	{
+		intros n gbg hn, clear gbg,
+		rcases hn with ⟨n_nat, hφ⟩,
+		have := h_inductive ⟨n, n_nat⟩ hφ,
+		rw ψ_def,
+		simp,
+		use succ_of_nat_is_nat (by rwa mem_omega at n_nat),
+		rw add_one at this,
+		exact this,
+	},
+
+	intro n,
+	cases (omega_induction h1 h2) n.nat with hφ hnat,
+	rwa @eq_of_set_eq {set := n.set, nat := hφ} n rfl at hnat,
+end
+
+lemma zero_add (a : natural) : 0 + a = a :=
+begin 
+	set φ := λn : natural, 0 + n = n with φ_def,
+	apply (induction φ (add_zero 0) _) a,
+	{
+		intros n hn,
+		rw φ_def at *,
+		rw add_succ 0 n,
+		rw hn,
+	},
+end
+
+lemma add_assoc (a b c : natural) : a + (b + c) = (a + b) + c :=
+begin 
+	set φ := λn : natural, a + (b + n) = (a + b) + n with φ_def,
+	apply induction φ _ _,
+	{
+		rw [φ_def, add_zero, add_zero],
+	},
+	{
+		intros n hn,
+		rw φ_def at *,
+		rw [add_succ b n, add_succ a (b+n), hn, add_succ (a+b) n],
+	}
+end
+
+lemma succ_add (a b : natural) : (a + 1) + b = (a + b) + 1 :=
+begin 
+	set φ := λn : natural, (a + 1) + n = (a + n) + 1 with φ_def,
+	apply induction φ _ _,
+	{
+		rw [φ_def, add_zero, add_zero],
+	},
+	{
+		intros n hn,
+		rw φ_def at *,
+		rw [add_succ, add_succ, hn],
+	},
+end
+
+lemma add_comm (a b : natural) : a + b = b + a :=
+begin 
+	set φ := λn : natural, a + n = n + a with φ_def,
+	apply induction φ (by rw [φ_def, add_zero, zero_add]) _,
+	{
+		intros n hn,
+		rw φ_def at *,
+		rw [add_succ, succ_add, hn],
+	},
+end
+
+lemma add_right_cancel (a b c : natural) (h : a + c = b + c) : a = b :=
+begin 
+	set φ := λn : natural, a + n = b + n → a = b with φ_def,
+	have := induction φ _ _,
+	swap,
+	{
+		rw [φ_def, add_zero, add_zero],
+		exact λh, h
+	},
+	swap,
+	{
+		intros n hn h,
+		rw φ_def at *,
+		apply hn,
+		rw [add_assoc, add_assoc] at h,
+		exact succ_inj h,
+	},
+
+	exact this c h,
+end
+
+end natural
+
+structure injection (f A B : Set) :=
+(f_func : set_function f)
+(f_domain : domain f = A)
+(f_range : range f ⊆ B)
+(f_injective : injective f)
+
+infix ` ≼` :50 := λ (A B : Set), ∃(f : Set) (f_inj : injection f A B), true
+
+infix ` ≈ `:50 := λA B, ∃(f : Set) (f_bi : bijection f A B), true
+
+infix ` ≺ `:50 := λ A B, A ≼ B ∧ ¬A ≈ B
+
+lemma cantors_theorem_helper {A f : Set} (f_func : set_function f) (hfA : domain f = A) : 
+¬ 𝒫 A ⊆ range f :=
+begin 
+	intro h,
+	let B := {x ∈ A | ∃(hx : x ∈ domain f), x ∉ eval f hx},
+	have hB : B ∈ 𝒫 A,
+	{
+		rw mem_powerset,
+		intros y hy,
+		rw mem_sep at hy,
+		exact hy.1,
+	},
+	have B_ss := h hB,
+	rw mem_range at B_ss,
+	rcases B_ss with ⟨x, hxBf⟩,
+	have hxf : x ∈ domain f,
+	{
+		rw mem_domain,
+		use [B, hxBf],
+	},
+	have f_at_x := eval_unique f hxf hxBf,
+	have : x ∈ B ↔ x ∉ B,
+	{
+		clear h,
+		split,
+		{
+			intros h,
+			rw mem_sep at h,
+			intro contra,
+			rcases h with ⟨hxA, hx2, hxf2⟩,
+			apply hxf2,
+			have := eval_behaves f hxf hx2,
+			rw [←this, ←f_at_x],
+			exact contra,
+		},
+		{
+			intro h,
+			rw mem_sep,
+			split,
+			{
+				rw hfA at hxf,
+				exact hxf,
+			},
+			{
+				use hxf,
+				rw← f_at_x,
+				exact h,
+			},
+		},
+	},
+	exact (not_iff_self (x ∈ B)).mp (iff.symm this),
+end
+
+theorem cantors_theorem (A : Set) : A ≺ 𝒫 A :=
+begin 
+	dsimp only,
+	split,
+	{
+		set φ := λx y, y = sing x with φ_def,
+		have φ_func : class_function_on_set φ A,
+		{
+			constructor,
+			intros x x_A,
+			use [sing x, rfl],
+
+			intros z hz,
+			rw φ_def at hz,
+			rw hz,
+		},
+		rcases set_func_of_class_func φ_func with ⟨f, f_func, f_dom, fφ⟩,
+		use f,
+		have f_inj : injection f A (𝒫 A) := {
+			f_func := f_func,
+			f_domain := f_dom,
+			f_range := begin 
+				intros y hy,
+				rw mem_range_iff f_func at hy,
+				rcases hy with ⟨x, x_dom, hx⟩,
+				rw f_dom at x_dom,
+				have := (fφ y x_dom).mp (eq.symm hx),
+				rw φ_def at this,
+				rw this,
+				rw mem_powerset,
+
+				intros k hk,
+				rw mem_sing at hk,
+				rw hk,
+				exact x_dom,
+			end,
+			f_injective := begin 
+				rw injective_iff f_func,
+				intros x y x_dom y_dom hxy,
+				rw← f_dom at fφ,
+				rw (fφ (sing x) x_dom).mpr rfl at hxy,
+				rw (fφ (sing y) y_dom).mpr rfl at hxy,
+				exact (sing_eq x y).mp hxy,
+			end,
+		},
+		use f_inj,
+	},
+		intro h,
+		rcases h with ⟨f, f_bi, -⟩,
+		have helper := cantors_theorem_helper f_bi.f_func f_bi.f_domain,
+		rw f_bi.f_range at helper,
+		exact helper (subset_self 𝒫 A),
+end
+
 structure cardinal (κ : Set) extends ordinal κ :=
-(is_card : ∀⦃ξ⦄, ξ ∈ ON → ξ ∈ κ → ξ ≺ κ)
+(is_card : ∀⦃ξ⦄ (ξ_ord : ordinal ξ), ξ ∈ κ → ¬κ ≼ ξ)
 
 def CARD : fclass := λx, ∃(x_card : cardinal x), true
 
@@ -5534,157 +6878,486 @@ classical.some κ_card
 
 lemma ord_of_card {κ : Set} (κ_card : cardinal κ) : ordinal κ := κ_card.to_ordinal
 
-theorem primitive_recursion (φ : relation) [class_function φ] :
-∃(ψ : relation) [ψ_func : class_function ψ], ∀⦃ξ : Set⦄ [ordinal ξ], 
-(@eval_class ψ ψ_func ξ) = φ @@ (@class_restriction ψ ψ_func ξ) :=
+def eval_on_set (f s : Set) : Set := 
+{y ∈ range f | ∃(x : Set) (hxs : x ∈ s), y = f @@ x}
+
+infix ` '' `:500 := eval_on_set
+
+lemma mem_eval_on_set {f s : Set} (f_func : set_function f) (s_dom : s ⊆ domain f) 
+(y : Set) : y ∈ f '' s ↔ ∃(x : Set) (hxs : x ∈ s), y = f @@ x 
+:=
 begin 
-	let App := λδ h, δ ∈ ON ∧ domain h = δ ∧ 
-	∃(h_func : set_function h), ∀⦃ξ⦄, ξ ∈ δ → h @@ ξ = φ @@ (set_restriction h ξ),
+	unfold eval_on_set,
+	rw mem_sep,
+	split,
+	{exact λh, h.2},
+	{
+		intro h,
+		rcases h with ⟨x, hxs, hyf⟩,
+		rw mem_range_iff f_func,
+		exact ⟨⟨x, s_dom hxs, hyf⟩, ⟨x, hxs, hyf⟩⟩,
+	}
+end
+
+lemma inj_of_subset {A B : Set} (h : A ⊆ B) : A ≼ B :=
+begin
+	use identity A,
+	have f_inj : injection (identity A) A B := {
+		f_func := identity_func A,
+		f_domain := identity_domain A,
+		f_range := 
+		begin 
+			rw identity_range A,
+			exact h,
+		end,
+		f_injective := identity_injective A,
+	},
+	use f_inj,
+end
+
+lemma ord_isomorphism_of_inj {A : Set} (R : relation) {f : Set} (f_inj : injection f A (range f)) :
+order_isomorphism f A R (range f) (λx y, R (f⁻¹ @@ x) (f⁻¹ @@ y)) :=
+{
+	f_func := f_inj.f_func,
+	f_domain := f_inj.f_domain,
+	f_range := rfl,
+	f_injective := f_inj.f_injective,
+	f_isomorphism := begin 
+		intros a b a_dom b_dom,
+		rw← f_inj.f_domain at a_dom b_dom,
+		rw [inv_func f_inj.f_func f_inj.f_injective a_dom, 
+		inv_func f_inj.f_func f_inj.f_injective b_dom]
+	end
+}
+
+
+lemma card_le_iff {α β: Set} (α_card : cardinal α) (β_card : cardinal β) : α ≤ β ↔ α ≼ β :=
+begin
+	have α_ord := ord_of_card α_card,
+	have β_ord := ord_of_card β_card,
+	split,
+	{
+		rw ord_le_iff_ss α_ord β_ord,
+		exact λh, inj_of_subset h
+	},
+	{
+		intro h,
+		by_contra gbg,
+		have hβα := ord_lt_of_not_le α_ord β_ord gbg, clear gbg,
+		exact (α_card.is_card β_ord hβα) h,
+	}
+end
+
+lemma has_least_ord_of_nonempty_class {φ : fclass} {β : Set} (β_ord : ordinal β) (hβφ : β ∈ φ) : 
+∃(α : Set) (α_ord : ordinal α), ∀⦃ξ⦄, ξ ∈ α → ξ ∉ φ :=
+begin 
+	set X := {α ∈ succ β | φ α} with X_def,
+	have sβ_ord := (succ_of_ordinal_is_ordinal β_ord),
+	have X_ss : subset_class X ON,
+	{
+		intros x hx,
+		rw mem_sep at hx,
+		exact ON_ordinal_class.tran (mem_ON_of_ord sβ_ord) hx.1,
+	},
+	have X_nonempty : X ≠ ∅,
+	{
+		intro h,
+		have : β ∈ X,
+		{
+			rw mem_sep,
+			exact ⟨lt_succ_self β, hβφ⟩,
+		},
+		rw h at this,
+		exact not_mem_empty this,
+	},
+
+	rcases ON_ordinal_class.wo.wf X_ss X_nonempty with ⟨α, αX, α_min⟩,
+	have α_ord := ord_of_mem_ON (X_ss αX),
+	use [α, α_ord],
+	intros ξ ξα hξ,
+	have contra : ξ ∈ X,
+	{
+		rw mem_sep at ⊢ αX,
+		exact ⟨sβ_ord.tran αX.1 ξα, hξ⟩,
+	},
+
+	exact α_min contra ξα,
+end
+
+lemma func_replacement (X : Set) (f : Set → Set) : ∃Y : Set, (∀y, y ∈ Y ↔ ∃x ∈ X, f x = y) :=
+begin 
+	set φ := λ x y, y = f x with φ_def,
+	have φ_func : class_function φ := {
+		is_func := 
+		begin 
+			intros x,
+			use f x,
+			rw φ_def,
+			simp,
+		end
+	},
+
+	cases @replacement' φ φ_func X with Y hY,
+	use Y,
+	rw φ_def at hY,
+	simp at hY,
+	intros y,
+	rw← hY y,
+	simp,
+	split,
+	{
+		intro h,
+		cases h with z hz,
+		use z,
+		finish,
+	},
+	{
+		intro h,
+		cases h with z hz,
+		use z,
+		finish,
+	}
+end
+
+
+theorem hartogs_theorem (A : Set) : ∃(κ : Set) (κ_card : cardinal κ), ¬κ ≼ A :=
+begin 
+	set W := {p ∈ 𝒫 A × 𝒫 (A × A) | ∃(B R : Set) (hp : p = ord_pair B R)
+	 (R_wo : well_order B (λx y, ord_pair x y ∈ R)), true } with W_def,
+
+	set φ := λ(x y : Set), ∃(X R: Set) (hx : x = ord_pair X R) 
+	(R_wo : well_order X (λa b, ord_pair a b ∈ R)), y = type X (λa b, ord_pair a b ∈ R) with φ_def,
+
+	have φ_func : class_function_on_set φ W :=
+	{
+		is_func := 
+		begin 
+			intros p hp,
+			rw [W_def, mem_sep, mem_prod] at hp,
+			cases hp with hp hp2,
+			rcases hp with ⟨X, R, hX, hR, hp⟩,
+			rw hp at *,
+			rw mem_powerset at hX hR,
+			rcases hp2 with ⟨X', R', hp2, hp3⟩,
+			rw ord_pair_eq_iff at hp2,
+			rw← hp2.1 at *,
+			rw← hp2.2 at *,
+			clear hp2,
+			rcases hp3 with ⟨R_wo, -⟩,
+			use type X (λa b, ord_pair a b ∈ R),
+			split,
+			{use [X, R, rfl, R_wo]},
+			{
+				intros z hz,
+				rw φ_def at hz,
+				rcases hz with ⟨X', R', hx2, R'_wo, hz⟩,
+				rw ord_pair_eq_iff at hx2,
+				rw← hx2.1 at *,
+				rw← hx2.2 at *,
+				rw hz,
+			}
+		end
+	},
+	have hφ : ∀⦃X R y : Set⦄ (hXR : ord_pair X R ∈ W),
+	 φ (ord_pair X R) y ↔ y = type X (λa b, ord_pair a b ∈ R),
+	{
+		intros X R y hXR,
+		split,
+		{
+			intro h,
+			rw φ_def at h,
+			rcases h with ⟨X1, R1, hXR1, R1_wo, hy⟩,
+			rw ord_pair_eq_iff at hXR1,
+			rw [hy, hXR1.1, hXR1.2],
+		},
+		{
+			intro h,
+			rw φ_def,
+			use [X, R, rfl],
+			rw [mem_sep] at hXR,
+			rcases hXR.2 with ⟨X1, R1, hXR1, R1_wo, -⟩,
+			rw ord_pair_eq_iff at hXR1,
+			rw [←hXR1.1, ←hXR1.2] at R1_wo,
+			use R1_wo,
+			exact h,
+		},
+	},
 	
-	let ψ := λx y, (x ∉ ON ∧ y = ∅) ∨ (x ∈ ON ∧ ∃(h δ : Set),
-	 x ∈ δ ∧ App δ h ∧ h @@ x = y),
-
-	have U : ∀h h' δ δ', δ ∈ ON → δ' ∈ ON → δ ≤ δ' → App δ h → App δ' h' →
-	h = set_restriction h' δ,
+	rcases restricted_replacement φ_func with ⟨α, hα⟩,
+	have α_ss_ON : subset_class α ON,
 	{
-		intros h h' δ δ' δ_ord δ'_ord hδδ' hhδ hhδ',
+		intros β hβ,
+		rw hα β at hβ,
+		rcases hβ with ⟨p, hpW, hp⟩,
+		rw φ_def at hp,
+		rcases hp with ⟨X, R, hp, hR, hβ⟩,
+		rw hβ,
+		have := type_ord X (λ (a b : Set), ord_pair a b ∈ R),
+		exact mem_ON_of_ord this,
+	},
+	rcases func_replacement α succ with ⟨β, hβ⟩,
+	have β_ss_ON : subset_class β ON,
+	{sorry},
+	set κ := union β with κ_def,
+	use κ,
+	have κ_ord := union_ordinal β_ss_ON,
+	rw← κ_def at κ_ord,
+	have hA : ∀(ξ : Set) (ξ_ord : ordinal ξ) (hξ : ξ ≼ A), ξ < κ,
+	{
+		intros ξ ξ_ord hξ,
+		rcases hξ with ⟨f, hf, -⟩,
+		have hf' : injection f ξ (range f) := sorry,
+		have f_iso := ord_isomorphism_of_inj (∈) hf',
+		set X := range f with X_def,
+		set R := λ (x y : Set), f⁻¹ @@ x ∈ f⁻¹ @@ y with R_def,
+		have X_wo := wo_of_order_isomorphic_to_wo ξ_ord.wo (inverse_order_isomorphism f_iso),
+		have X_ss_A : X ⊆ A,
+		{
+			rw X_def,
+			exact hf.f_range,
+		},
 
-		rcases hhδ.2.2 with ⟨h_func, h_aprox⟩,
-		rcases hhδ'.2.2 with ⟨h'_func, h'_aprox⟩,
-		have h_dom := hhδ.2.1,
-		have h'_dom := hhδ'.2.1,
+		set R_set := {p ∈ A × A | ∃(a b : Set) (hp : p = ord_pair a b), R a b} with R_def',
+		have hXR : ord_pair X R_set ∈ W,
+		{
+			rw [W_def, mem_sep, mem_prod_pair, mem_powerset, mem_powerset],
+			split,
+			{
+				use X_ss_A,
+				intros p hp,
+				rw [R_def', mem_sep] at hp,
+				exact hp.1,
+			},
+			{
+				use [X, R_set, rfl],
+				have hR : ∀{a b : Set} (ha : a ∈ A) (hb : b ∈ A), ord_pair a b ∈ R_set ↔R a b, 
+				{
+					intros a b ha hb,
+					rw [R_def, R_def', mem_sep, mem_prod_pair],
+					simp,
+					split,
+					{
+						intro h,
+						rcases h.2 with ⟨a2, b2, hab2, habR⟩,
+						rw ord_pair_eq_iff at hab2,
+						rw R_def at habR,
+						rw [hab2.1, hab2.2] at *,
+						exact habR,
+					},
+					{
+						intro h,
+						use [⟨ha, hb⟩, a, b, rfl],
+						rw R_def,
+						exact h,
+					},
+				},
+				have R_wo : well_order X (λ (x y : Set), ord_pair x y ∈ R_set),
+				{
+					fconstructor,
+					{
+						intros x hx,
+						have hxA := X_ss_A hx,
+						dsimp only,
+						rw hR hxA hxA,
+						exact X_wo.irrfl hx,
+					},
+					{
+						intros a b c ha hb hc hab hbc,
+						rw hR (X_ss_A ha) (X_ss_A hb) at hab,
+						rw hR (X_ss_A hb) (X_ss_A hc) at hbc,
+						rw hR (X_ss_A ha) (X_ss_A hc) at ⊢,
+						exact X_wo.tran ha hb hc hab hbc,
+					},
+					{
+						intros a b ha hb,
+						dsimp only,
+						rw hR (X_ss_A ha) (X_ss_A hb),
+						rw hR (X_ss_A hb) (X_ss_A ha),
+						exact X_wo.tri ha hb,
+					},
+					{
+						intros Y Y_ss Y_ne,
+						have Y_ss_A := subset_trans Y_ss X_ss_A,
+						rcases X_wo.wf Y_ss Y_ne with ⟨y, hyY, hy⟩,
+						use [y, hyY],
+						intros x hxY,
+						dsimp only,
+						rw hR (Y_ss_A hxY) (Y_ss_A hyY),
+						exact hy hxY,
+					},
+				},
+				use R_wo,
+			},
+		},
 
-		have hh'_dom : domain h = domain (set_restriction h' δ),
+		have XR_α : type X R ∈ α := sorry,
+		have XR_β : succ (type X R) ∈ β := sorry,
+		have XR_κ : type X R ∈ κ,
 		{
-			have : δ ⊆ domain h',
-			{
-				rw h'_dom,
-				rwa le_iff_subset,
-				exact δ_ord, exact δ'_ord,
-			}, 
-			have := @domain_of_restriction_ss h' δ this h'_func,
-			finish,
+			rw κ_def,
+			rw mem_union,
+			use [succ (type X R), XR_β, lt_succ_self (type X R)],
 		},
-		
-		have h'_rest_func := (is_func_restriction h'_func δ),
-		rw @func_ext h (set_restriction h' δ) h_func h'_rest_func hh'_dom,
-		rw h_dom,
-		let X := {ξ ∈ δ | h @@ ξ ≠ h' @@ ξ},
-		by_cases X_empty : X = ∅,
-		{
-			by_contra hcontra,
-			push_neg at hcontra,
-			rcases hcontra with ⟨ξ, hξ⟩,
-			have contra : ξ ∈ X,
-			{
-				rw mem_sep,
-				use hξ.1,
-				rw @restriction_agrees h' δ h'_func ξ hξ.1,
-				exact hξ.2,
-			},
-			rw X_empty at contra,
-			simp at contra,
-			exact contra,
-		},
-		{
-			exfalso,
-			have X_ss : X ⊆ δ,
-			{
-				intros x hx,
-				rw mem_sep at hx,
-				exact hx.1,
-			},
-			rcases (ord_of_mem_ON δ_ord).wo.wf X_ss X_empty with ⟨ξ, hξX, ξ_min⟩,
-			rw mem_sep at hξX,
-			suffices : set_restriction h ξ = set_restriction h' ξ,
-			{
-				specialize h_aprox hξX.1,
-				rw← le_iff_subset δ_ord δ'_ord at hδδ',
-				specialize h'_aprox (hδδ' hξX.1),
-				rw [h_aprox, h'_aprox, this] at hξX,
-				exact not_imp.mpr hξX (congr_fun rfl),
-			},
-			{
-				have ξ_ss_dom : ξ ⊆ domain h,
-				{
-					rw h_dom,
-					rw le_iff_subset (mem_of_ordinal_is_ordinal δ_ord hξX.1) δ_ord,
-					unfold has_le.le,
-					left,
-					exact hξX.1,
-				},
-				have h_rest_dom : domain (set_restriction h ξ) = ξ := 
-				@domain_of_restriction_ss h ξ ξ_ss_dom h_func,
-				have h'_rest_dom : domain (set_restriction h' ξ) = ξ,
-				{
-					rw← le_iff_subset δ_ord δ'_ord at hδδ',
-					rw h_dom at ξ_ss_dom,
-					have := subset_trans ξ_ss_dom hδδ',
-					rw← h'_dom at this,
-					exact @domain_of_restriction_ss h' ξ this h'_func,
-				},
-				have obv : domain (set_restriction h ξ) = domain (set_restriction h' ξ) := 
-				(rfl.congr (eq.symm h'_rest_dom)).mp h_rest_dom,
-				rw @func_ext (set_restriction h ξ) (set_restriction h' ξ) 
-				(is_func_restriction h_func ξ) (is_func_restriction h'_func ξ) obv,
-				rw h_rest_dom,
-				by_contra hcontra,
-				push_neg at hcontra,
-				rcases hcontra with ⟨γ, hγ⟩,
-				have contra : γ ∈ X,
-				{
-					rw mem_sep,
-					use (ord_of_mem_ON δ_ord).tran hξX.1 hγ.1,
-					have := @restriction_agrees h ξ h_func γ hγ.1,
-					rw← this at hγ,
-					have := @restriction_agrees h' ξ h'_func γ hγ.1,
-					rw← this at hγ,
-					exact hγ.2,
-				},
-				exact ξ_min contra hγ.1,
-			},
-		},
-		
+
+		have := order_isomorphism_comp f_iso (type_iso X_wo),
+		rw (ordinals_isomorphic_iff_eq ξ_ord (type_ord X R)).mp
+		 ⟨type_isomorphism X_wo ∘ f, this, trivial⟩,
+		 exact XR_κ,
+
+	},
+	have κ_card : cardinal κ :=
+	{
+		wo := κ_ord.wo,
+		tran := κ_ord.tran,
+		is_card := 
+		begin 
+			intros ξ ξ_ord hξ,
+			sorry
+		end,
 	},
 
-	have E : ∀⦃δ⦄, δ ∈ ON → ∃!h, App δ h,
-	{
-		sorry,
-	},
+	sorry,
+end
 
-	have ψ_func : class_function ψ,
+def wf_relation (s y : Set) :=
+(∃(s_func : set_function s),
+(∃(α : Set) (α_ord : ordinal α), domain s = succ α ∧ y = 𝒫 (s @@ α)) ∨ 
+(∃(γ : Set) (γ_ord : ordinal γ) (γ_lim : is_limit γ_ord), 
+domain s = γ ∧ y = union (s '' γ))) ∨
+((domain s ∉ ON ∨ domain s = ∅ ∨ ¬(∃(s_func : set_function s), true)) ∧ y = ∅)
+
+lemma func_of_wf_relation : class_function wf_relation :=
+begin 
+	fconstructor,
+	unfold is_class_function,
+	intros s,
+	by_cases ∃(s_func : set_function s)(dom_ord : ordinal (domain s)), domain s ≠ ∅,
 	{
-		constructor,
-		unfold is_class_function,
-		intro δ,
-		by_cases δ_ord : δ ∈ ON,
+		rcases h with ⟨s_func, dom_ord, dom_nonempty⟩,
+		by_cases h_lim : is_limit dom_ord,
 		{
-			specialize E δ_ord,
-			sorry,
-		},
-		{
-			use ∅,
+			use union (s '' (domain s)),
 			split,
 			{
 				left,
-				exact ⟨δ_ord, rfl⟩,
+				use s_func,
+				right,
+				use [domain s, dom_ord, h_lim, rfl],
 			},
 			{
 				intros z hz,
 				cases hz,
 				{
-					exact eq.symm hz.2,
+					rcases hz with ⟨-, α, α_ord⟩,
+					{
+						exfalso,
+						rcases α_ord with ⟨α_ord, hsα, hpow⟩,
+						exact h_lim.2 ⟨α, α_ord, hsα⟩,
+					},
+					{
+						rcases hz_h with ⟨γ, γ_ord, γ_lim, hdom⟩,
+						rw hdom.1,
+						exact eq.symm hdom.2,
+					},
+				},
+				cases hz with contra zempty,
+				exfalso,
+				cases contra,
+				{exact contra (mem_ON_of_ord dom_ord)},
+				cases contra,
+				{exact dom_nonempty contra},
+				{exact contra ⟨s_func, trivial⟩}
+			},
+		},
+		{
+			unfold is_limit at h_lim,
+			push_neg at h_lim,
+			specialize h_lim dom_nonempty,
+			rcases h_lim with ⟨α, α_ord, hα⟩,
+			use 𝒫 (s @@ α),
+			split,
+			{
+				left,
+				use [s_func, α, α_ord, hα],
+			},
+			{
+				intros z hz,
+				cases hz,
+				{
+					rcases hz with ⟨-, β, β_ord, hβ⟩,
+					rw hα at hβ,
+					rw succ_inj_on_ON α_ord hβ.1,
+					exact eq.symm hβ.2,
+
+					rcases hz_h with ⟨γ, γ_ord, γ_lim, hγ⟩,
+					exfalso,
+					rw hα at hγ,
+					exact γ_lim.2 ⟨α, α_ord, eq.symm hγ.1⟩,
 				},
 				{
 					exfalso,
-					exact δ_ord hz.1,
+					cases hz.1,
+					{
+						apply h,
+						rw hα,
+						exact mem_ON_of_ord (succ_of_ordinal_is_ordinal α_ord),
+					},
+					cases h,
+					{exact dom_nonempty h},
+					{
+						exact h ⟨s_func, trivial⟩,
+					},
 				},
 			},
 		},
 	},
-
-	use [ψ, ψ_func],
-	sorry,
+	{
+		push_neg at h,
+		use ∅,
+		split,
+		{
+			right,
+			split,
+			{
+				by_contra hcontra,
+				push_neg at hcontra,
+				have s_ord := ord_of_mem_ON hcontra.1,
+				cases hcontra.2.2,
+				exact hcontra.2.1 (h w s_ord),
+			},
+			{refl}
+		},
+		{
+			intros z hz,
+			cases hz,
+			{
+				rcases hz with ⟨s_func, h2⟩,
+				cases h2,
+				{
+					rcases h2 with ⟨α, α_ord, hα⟩,
+					have dom_ord : ordinal (domain s),
+					{
+						rw hα.1,
+						exact succ_of_ordinal_is_ordinal α_ord,
+					},
+					rw h s_func dom_ord at hα,
+					exfalso,
+					have := lt_succ_self α,
+					rw← hα.1 at this,
+					exact not_mem_empty this,
+				},
+				{
+					exfalso,
+					rcases h2 with ⟨γ, γ_ord, γ_lim, hγ⟩,
+					rw← hγ.1 at γ_ord,
+					rw h s_func γ_ord at hγ,
+					exact γ_lim.1 (eq.symm hγ.1),
+				},
+			},
+			{exact eq.symm hz.2},
+		},
+	},
 end
+
 
 end test
